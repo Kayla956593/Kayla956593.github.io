@@ -1,1 +1,26 @@
-body{text-align:center;}h2{/*預留歌曲名稱顯示空間*/height:32px;font-size:medium;}
+body{text-align:center;}
+h2{/*預留歌曲名稱顯示空間*/height:50px;font-size:medium;}
+
+
+ 
+.buttonRed {
+border-radius: 15px;
+  box-shadow: 0 7px #737373;
+  background-color: rgb(198, 191, 243);
+   
+  color: rgb(0, 0, 0);
+  padding: 15px 15px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  font-size: 16px;
+  margin: 3px 3px;
+  cursor: pointer;
+  margin-top: 15px;
+}
+
+.buttonRed:hover{
+	background-color: #b2ebf5ea;
+	box-shadow: 0 5px #666;
+  transform: translateY(4px);
+}

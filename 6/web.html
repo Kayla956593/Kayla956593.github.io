@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Sequence Logo Visualization</title> 
+<style> 
+body {
+  font-family: Arial, sans-serif;
+  margin: 20px;
+}
+h1 {
+  text-align: center;
+}
+.butns{
+	margin-top:20px;
+}
+.input{
+	width:100%;
+	height:160px;
+} 
+</style> 
+</head>
+<body>
+  <h1>Sequence Logo Visualization</h1>
+
+<div class="slidecontainer" style="margin-left:auto;margin-right:auto;">
+	<div class="w3-container w3-cell">
+		<canvas id="bio" width="900" height="200" class="w3-animate-zoom"></canvas>
+	</div>
+</div>
+
+<canvas id="letter" width="370" height="410" style="margin-left:auto;margin-right:auto;display: none;"></canvas>
+
+<hr>
+
+<div class="slidecontainer">
+
+	<div class="w3-container w3-cell">
+		<label>Enter sequences:</label><hr>
+		<textarea class="input" rows="4" cols="50" id="mset"></textarea>
+	</div>
+
+</div>
+
+<div class="output">
+
+  <input type="file" id="file-input" accept=".txt" />
+ 
+  <button onclick="handleSequenceInput()">Generate Logo</button>
+	
+  <div class="butns" id="download-section">
+    <button onclick="downloadLogo('jpg')">Download as JPG</button>
+    <button onclick="downloadLogo('png')">Download as PNG</button>
+    <button onclick="downloadLogo('svg')">Download as SVG</button>
+  </div> 
+
+</div>
+
+<div class="slidecontainer">
+   
+	<div class="w3-container w3-cell">
+	  <p><input type="range" min="100" max="1000" value="200" class="slider" id="canvas_h"></p>
+	</div>
+	  
+	<div class="w3-container w3-cell">
+	  <p><div class="slidecontainer" id="info_canvas_h">200 px</div></p>
+	</div>
+  
+ 
+
+	<div class="w3-container w3-cell">
+	  <p><input type="range" min="600" max="2000" value="900" class="slider" id="canvas_w"></p>
+	</div>
+	  
+	<div class="w3-container w3-cell">
+	  <p><div class="slidecontainer" id="info_canvas_w">900 px</div></p>
+	</div>
+  
+</div>
+ 
+<div class="slidecontainer">
+
+	<div class="w3-container w3-cell">
+	  <p>Start from position:</p>
+	</div>
+
+	<div class="w3-container w3-cell">
+	  <p><input type="range" min="-20" max="20" value="0" class="slider w3-animate-zoom" id="start_from"></p>
+	</div>
+	  
+	<div class="w3-container w3-cell">
+	  <p><div class="slidecontainer" id="info_sq">1</div></p>
+	</div>
+
+</div>
+
+<div class="slidecontainer">
+
+	<div class="w3-container w3-cell">
+	  <p>Axis thickness:</p>
+	</div>
+
+	<div class="w3-container w3-cell">
+	  <p><input type="range" min="1" max="8" value="3" class="slider w3-animate-zoom" id="lines_ax"></p>
+	</div>
+	  
+	<div class="w3-container w3-cell">
+	  <p><div class="slidecontainer" id="info_ax">3 pixels</div></p>
+	</div>
+
+</div>
+
+<div class="slidecontainer">
+
+	<div class="w3-container w3-cell">
+	  <p>Bottom font size:</p>
+	</div>
+
+	<div class="w3-container w3-cell">
+	  <p><input type="range" min="15" max="28" value="28" class="slider w3-animate-zoom" id="font_bo"></p>
+	</div>
+	  
+	<div class="w3-container w3-cell">
+	  <p><div class="slidecontainer" id="info_bo">28 pixels</div></p>
+	</div>
+
+</div>
+ 
+<div class="slidecontainer">
+
+	<div class="w3-container w3-cell">
+	  <p>Letter size:</p>
+	</div>
+
+	<div class="w3-container w3-cell">
+	  <p><input type="range" min="500" max="550" value="530" class="slider w3-animate-zoom" id="letter_lo"></p>
+	</div>
+	  
+	<div class="w3-container w3-cell">
+	  <p><div class="slidecontainer" id="info_lo">540 pixels</div></p>
+	</div>
+
+</div>
+
+<hr>
+
+<div class="slidecontainer">
+
+	<div class="w3-container w3-cell">
+	  <p>
+	  <input class="w3-check" type="checkbox" id="show_bottom" checked>
+	  <label>Show baseline</label>
+	  </p>
+	</div>
+
+	<div class="w3-container w3-cell">
+	  <p>
+	  <input class="w3-check" type="checkbox" id="show_bottom_divisions" checked>
+	  <label>Show baseline divisions</label>
+	  </p>
+	</div>
+
+</div> 
+ 
+<script>
+var fileInput = document.getElementById('file-input');
+
+fileInput.addEventListener('change', function(event) {
+  var file = event.target.files[0]; // Get the selected file
+  var reader = new FileReader();
+
+  reader.onload = function(event) {
+    var c = event.target.result;
+    //window.alert(fileContent); // The content of the file will be logged here
+    
+    // You can perform further processing on the file content here
+	if(c==''){/*
+			var canvas = document.getElementById("letter");
+			var context = canvas.getContext("2d");
+
+			context.clearRect(0, 0, canvas.width, canvas.height);*/
+			alert("enter something"); 
+			//return;
+		}
+		var lines = c.split('\n');
+		var test_length = lines[0].length;
+		 
+		for(var i=0;i<lines.length;i++){
+			//alert(lines[i].length);
+			
+			if(test_length!=lines[i].length){
+				if(lines[i]!=''&&lines[i].length!=test_length-1){
+					alert("All sequences must have the same length!"); 
+				}
+			}
+		}
+		
+		c = c.replace(/\n/g, ',').replace(/ /g, '').replace(/&emsp;/g, '').replace(/\t/g, '').replace(/	/g, '');
+		 
+		c = c.replace(/,,/g, ',');
+		if(c.charAt(0)==','){c = c.substring(1, c.length);}
+		
+		var tmp = matrix(c);
+		logo(tmp[0],tmp[1]);
+  };
+
+  reader.readAsText(file); // Read the file as text
+}); 
+
+function downloadLogo(format) {
+    var canvas = document.getElementById("bio");
+    var link = document.createElement('a');
+    link.download = "sequence_logo." + format;
+    
+    if (format === "jpg") {
+        link.href = canvas.toDataURL("image/jpeg");
+    } else if (format === "png") {
+        link.href = canvas.toDataURL("image/png");
+    } else if (format === "svg") {
+		var svg = createSVGWithCanvas("bio"); // Create SVG with canvas drawn inside
+		  var svgData = new XMLSerializer().serializeToString(svg); // Serialize SVG to XML string
+		  
+		  var blob = new Blob([svgData], { type: "image/svg+xml" }); // Create SVG blob
+		  
+		  link.href = URL.createObjectURL(blob); // Set the href of the link to the SVG blob
+	}
+    
+    link.click();
+}
+
+function createSVGWithCanvas(canvasId) {
+  var canvas = document.getElementById(canvasId);
+  var svgNamespace = "http://www.w3.org/2000/svg";
+  
+  // Create SVG element
+  var svg = document.createElementNS(svgNamespace, "svg");
+  svg.setAttribute("xmlns", svgNamespace);
+  
+  // Set SVG dimensions to match canvas
+  svg.setAttribute("width", canvas.width);
+  svg.setAttribute("height", canvas.height);
+  
+  // Create SVG image element
+  var svgImage = document.createElementNS(svgNamespace, "image");
+  svgImage.setAttributeNS(null, "width", canvas.width);
+  svgImage.setAttributeNS(null, "height", canvas.height);
+  
+  // Draw canvas content onto SVG image
+  svgImage.setAttributeNS("http://www.w3.org/1999/xlink", "xlink:href", canvas.toDataURL("image/png"));
+  
+  // Append SVG image to SVG element
+  svg.appendChild(svgImage);
+  
+  return svg;
+} 
+
+function handleSequenceInput() {
+  var c = document.getElementById("mset").value;
+  if (c === '') {
+    alert("Enter something");
+    return;
+  }
+  
+  var lines = c.split('\n');
+  var testLength = lines[0].length;
+
+  for (var i = 0; i < lines.length; i++) {
+    if (testLength !== lines[i].length && lines[i] !== '') {
+      alert("All sequences must have the same length!");
+      return;
+    }
+  }
+
+  c = c.replace(/\n/g, ',').replace(/ /g, '').replace(/&emsp;/g, '').replace(/\t/g, '').replace(/	/g, '');
+  c = c.replace(/,,/g, ',');
+  if (c.charAt(0) === ',') {
+    c = c.substring(1);
+  }
+
+  var [p, max] = matrix(c);
+  logo(p, max);
+}
+
+
+	//Input text
+	
+	//Canvas Height
+	document.getElementById("canvas_h").oninput = function() {
+		document.getElementById('bio').height = this.value;
+		document.getElementById("info_canvas_h").innerHTML = this.value + " px";
+
+		tmp = matrix(c);
+		logo(tmp[0],tmp[1]);
+	}
+	
+	//Canvas Width
+	document.getElementById("canvas_w").oninput = function() {
+		document.getElementById('bio').width = this.value;
+		document.getElementById("info_canvas_w").innerHTML = this.value + " px";
+		
+		tmp = matrix(c);
+		logo(tmp[0],tmp[1]);
+	}
+
+	//Start from position
+	document.getElementById("start_from").oninput = function() {
+		document.getElementById("info_sq").innerHTML = Number(this.value) + 1;
+		sq = this.value;
+		tmp = matrix(c);
+		logo(tmp[0],tmp[1]);
+	}
+
+	//Axis thickness:
+	document.getElementById("lines_ax").oninput = function() {
+		document.getElementById("info_ax").innerHTML = Number(this.value) + ' pixels';
+		li = this.value;
+		tmp = matrix(c);
+		logo(tmp[0],tmp[1]);
+	}
+	
+	//Bottom font size:
+	document.getElementById("font_bo").oninput = function() {
+		document.getElementById("info_bo").innerHTML = Number(this.value) + ' pixels';
+		bo = this.value;
+		tmp = matrix(c);
+		logo(tmp[0],tmp[1]);
+	}
+
+	//Letter size:
+	document.getElementById("letter_lo").oninput = function() {
+		document.getElementById("info_lo").innerHTML = Number(this.value) + ' pixels';
+		lo = this.value;
+		tmp = matrix(c);
+		logo(tmp[0],tmp[1]);
+	}
+	
+	//Show bottom
+	document.getElementById("show_bottom").oninput = function() {
+		tmp = matrix(c);
+		logo(tmp[0],tmp[1]);
+	}
+
+	//Show bottom divisions
+	document.getElementById("show_bottom_divisions").oninput = function() {
+		tmp = matrix(c);
+		logo(tmp[0],tmp[1]);
+	}
+
+
+var sq = 0;  // position
+var li = 3;	 // axis line
+var bo = 28; // bottom font size
+var lo = 540;// letter size
+ 
+//RPN4
+
+var c = 'GDLGAGKTT,' +
+		'GDLGAGKTT,' +
+		'GPLGAGKTS,' +
+		'GDLGAGKTS,' +
+		'GDLGAGKTT,' +
+		'GDLGAGKTT,' +
+		'GEVGSGKTT,' +
+		'GELGAGKTT,' +
+		'GDLGAGKTI,' +
+		'GNLGAGKTT,' +
+		'GELGAGKTT,' +
+		'GTLGAGKTT,' +
+		'GDLGAGKTT,' +
+		'GDLGAGKTT,' +
+		'GDLGAGKTT,' +
+		'GDLGAGKTT,' +
+		'GDLGAGKTT,'; 
+
+
+document.getElementById("mset").innerHTML = c.replace(/,/g, '\n');
+
+var tmp;
+
+tmp = matrix(c);
+logo(tmp[0],tmp[1]);
+
+
+function matrix(c) {
+  var s = c.split(',').map((item) => item.split(''));
+  var n = s.length;
+  
+  var a = [...new Set(c.replace(/,/g, '').split(''))];
+  var k = a.length;
+  
+  var p = a.map((letter) => {
+    var row = Array(s[0].length + 1).fill(0);
+    row[0] = letter;
+    return row;
+  });
+
+  for (var i = 0; i < s.length; i++) {
+    for (var j = 0; j < s[i].length; j++) {
+      var letterIndex = a.indexOf(s[i][j]);
+      if (letterIndex !== -1) {
+        p[letterIndex][j + 1]++;
+      }
+    }
+  }
+
+  var max = 0;
+  for (var i = 0; i < p.length; i++) {
+    for (var j = 1; j < p[i].length; j++) {
+      p[i][j] = (p[i][j] / s.length).toFixed(2);
+      if (max <= p[i][j]) {
+        max = p[i][j];
+      }
+      p[i][j] += '|' + p[i][0];
+    }
+  }
+
+  return [p, max];
+}
+//SORT
+function iSort(a) {
+  for (var i = 1; i < a.length; i++) {
+    let [n, letter] = a[i];
+    let j = i - 1;
+
+    while (j > -1 && n < a[j][0]) {
+      a[j + 1][0] = a[j][0];
+      [a[j + 1][1], a[j][1]] = [a[j][1], a[j + 1][1]];
+      j--;
+    }
+
+    a[j + 1][0] = n;
+  }
+
+  return a;
+}
+
+function logo(M, max) {
+  var canvas = document.getElementById('bio');
+  var ctx = canvas.getContext('2d');
+  var canvasl = document.getElementById('letter');
+  var ctl = canvasl.getContext('2d');
+
+  ctl.clearRect(0, 0, canvasl.width, canvasl.height);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  var t = M[0].length;
+  var w = canvas.width - 80;
+  var h = canvas.height - 40;
+
+  if (canvas.getContext) {
+    for (var j = 1; j < t; j++) {
+      var a = [];
+
+      for (var k = 0; k < M.length; k++) {
+        a[k] = M[k][j].split('|');
+      }
+
+      a.sort(function(a, b) {
+        return a[0] - b[0];
+      });
+
+      var iw = w / (t - 1) - 1;
+      var x = 80 + (j - 1) * iw;
+      var pune = 0;
+
+      for (var u = 0; u < a.length; u++) {
+        ctl.clearRect(0, 0, canvasl.width, canvasl.height);
+        ctl.fillStyle = getColor(a[u][1]);
+        ctl.font = 'bold ' + lo + 'px Arial';
+        ctl.fillText(a[u][1], canvasl.width / 2 - ctl.measureText(a[u][1]).width / 2, canvasl.height - 5);
+
+        var y = h - Math.floor((h / max) * (Number(a[u][0]) + pune));
+        var ih = (u > 0) ? h - (h / max) * pune - y : h - y;
+        pune += Number(a[u][0]);
+        ih = Math.floor(ih);
+
+        ctx.drawImage(canvasl, x, y, iw, ih);
+      }
+    }
+
+    if (t >= 2) {
+      ctx.lineWidth = li;
+      ctx.strokeStyle = '#454545';
+
+      for (var i = 1; i < t; i++) {
+        if (document.getElementById("show_bottom_divisions").checked) {
+          ctx.moveTo(80 + Math.floor(iw * i), h + 4);
+          ctx.lineTo(80 + Math.floor(iw * i), h + 20);
+        }
+
+        ctx.font = bo + 'px Arial';
+        var txt = Number(i) + Number(sq);
+        var ltr = ctx.measureText(txt).width;
+        ctx.fillText(txt, (iw / 2) - (ltr / 2) + 80 + (i - 1) * iw, h + 40);
+      }
+
+      ctx.stroke();
+
+      ctx.moveTo(60, h + 4);
+      ctx.lineTo((document.getElementById("show_bottom").checked) ? 80 + Math.floor(iw * (t - 1)) : 75, h + 4);
+      ctx.stroke();
+
+      ctx.moveTo(75, 4);
+      ctx.lineTo(75, h + 40);
+      ctx.stroke();
+
+      for (var i = 0; i < 10; i++) {
+        var fi = (i === 0) ? 0 : 65;
+        ctx.moveTo(75, 4 + Math.floor((h + 4) / 10) * i);
+        ctx.lineTo(fi, 4 + Math.floor((h + 4) / 10) * i);
+      }
+
+      ctx.stroke();
+
+      ctx.save();
+      ctx.translate(0, 32);
+      ctx.font = "30px Arial";
+      ctx.fillStyle = "#000000";
+      ctx.textAlign = "left";
+      ctx.fillText('Max', 0, 0);
+      ctx.restore();
+
+      ctx.save();
+      ctx.translate(40, h + 15);
+      ctx.font = "30px Arial";
+      ctx.fillStyle = "#000000";
+      ctx.textAlign = "left";
+      ctx.fillText('0', 0, 0);
+      ctx.restore();
+    }
+  }
+}
+
+function getColor(letter) {
+  switch (letter) {
+    case 'G':
+      return '#fcaf07';
+    case 'T':
+      return '#d50000';
+    case 'A':
+      return '#07d607';
+    case 'C':
+      return '#0909c8';
+    default:
+      return 'black';
+  }
+} 
+  
+  </script>
+</body>
+</html>  

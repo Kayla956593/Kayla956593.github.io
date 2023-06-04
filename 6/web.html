@@ -35,7 +35,7 @@ h1 {
 <div class="slidecontainer">
 
 	<div class="w3-container w3-cell">
-		<label>Enter sequences or Input txt file:</label><hr>
+		<label>Enter sequences:</label><hr>
 		<textarea class="input" rows="4" cols="50" id="mset"></textarea>
 	</div>
 
@@ -285,65 +285,61 @@ function handleSequenceInput() {
 	
 	//Canvas Height
 	document.getElementById("canvas_h").oninput = function() {
-		document.getElementById('bio').height = this.value;
-		document.getElementById("info_canvas_h").innerHTML = this.value + " px";
+    document.getElementById('bio').height = this.value;
+    document.getElementById("info_canvas_h").innerHTML = this.value + " px";
 
-		tmp = matrix(c);
-		logo(tmp[0],tmp[1]);
-	}
-	
-	//Canvas Width
-	document.getElementById("canvas_w").oninput = function() {
-		document.getElementById('bio').width = this.value;
-		document.getElementById("info_canvas_w").innerHTML = this.value + " px";
-		
-		tmp = matrix(c);
-		logo(tmp[0],tmp[1]);
-	}
+    updateLogo();
+}
 
-	//Start from position
-	document.getElementById("start_from").oninput = function() {
-		document.getElementById("info_sq").innerHTML = Number(this.value) + 1;
-		sq = this.value;
-		tmp = matrix(c);
-		logo(tmp[0],tmp[1]);
-	}
+document.getElementById("canvas_w").oninput = function() {
+    document.getElementById('bio').width = this.value;
+    document.getElementById("info_canvas_w").innerHTML = this.value + " px";
 
-	//Axis thickness:
-	document.getElementById("lines_ax").oninput = function() {
-		document.getElementById("info_ax").innerHTML = Number(this.value) + ' pixels';
-		li = this.value;
-		tmp = matrix(c);
-		logo(tmp[0],tmp[1]);
-	}
-	
-	//Bottom font size:
-	document.getElementById("font_bo").oninput = function() {
-		document.getElementById("info_bo").innerHTML = Number(this.value) + ' pixels';
-		bo = this.value;
-		tmp = matrix(c);
-		logo(tmp[0],tmp[1]);
-	}
+    updateLogo();
+}
 
-	//Letter size:
-	document.getElementById("letter_lo").oninput = function() {
-		document.getElementById("info_lo").innerHTML = Number(this.value) + ' pixels';
-		lo = this.value;
-		tmp = matrix(c);
-		logo(tmp[0],tmp[1]);
-	}
-	
-	//Show bottom
-	document.getElementById("show_bottom").oninput = function() {
-		tmp = matrix(c);
-		logo(tmp[0],tmp[1]);
-	}
+document.getElementById("start_from").oninput = function() {
+    document.getElementById("info_sq").innerHTML = Number(this.value) + 1;
+    sq = this.value;
 
-	//Show bottom divisions
-	document.getElementById("show_bottom_divisions").oninput = function() {
-		tmp = matrix(c);
-		logo(tmp[0],tmp[1]);
-	}
+    updateLogo();
+}
+
+document.getElementById("lines_ax").oninput = function() {
+    document.getElementById("info_ax").innerHTML = Number(this.value) + ' pixels';
+    li = this.value;
+
+    updateLogo();
+}
+
+document.getElementById("font_bo").oninput = function() {
+    document.getElementById("info_bo").innerHTML = Number(this.value) + ' pixels';
+    bo = this.value;
+
+    updateLogo();
+}
+
+document.getElementById("letter_lo").oninput = function() {
+    document.getElementById("info_lo").innerHTML = Number(this.value) + ' pixels';
+    lo = this.value;
+
+    updateLogo();
+}
+
+document.getElementById("show_bottom").oninput = function() {
+    updateLogo();
+}
+
+document.getElementById("show_bottom_divisions").oninput = function() {
+    updateLogo();
+}
+
+function updateLogo() {
+    var tmp = matrix(c);
+    logo(tmp[0], tmp[1]);
+}
+
+
 
 
 var sq = 0;  // position
@@ -438,6 +434,9 @@ function logo(M, max) {
   var ctx = canvas.getContext('2d');
   var canvasl = document.getElementById('letter');
   var ctl = canvasl.getContext('2d');
+	var a = [];
+    var wl = canvasl.width;
+    var hl = canvasl.height;
 
   ctl.clearRect(0, 0, canvasl.width, canvasl.height);
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -465,15 +464,19 @@ function logo(M, max) {
       for (var u = 0; u < a.length; u++) {
         ctl.clearRect(0, 0, canvasl.width, canvasl.height);
         ctl.fillStyle = getColor(a[u][1]);
-        ctl.font = 'bold ' + lo + 'px Arial';
-        ctl.fillText(a[u][1], canvasl.width / 2 - ctl.measureText(a[u][1]).width / 2, canvasl.height - 5);
+        ctl.font = 'bold ' + lo + 'px Arial'; 
 
-        var y = h - Math.floor((h / max) * (Number(a[u][0]) + pune));
-        var ih = (u > 0) ? h - (h / max) * pune - y : h - y;
-        pune += Number(a[u][0]);
-        ih = Math.floor(ih);
+				var ltr = ctl.measureText(a[u][1]).width;
+				ctl.fillText(a[u][1], (wl/2)-(ltr/2), hl-5);
+				
+				
+				var y = h-(h/max)*a[u][0]; 
+				
+				if(u>0){var ih = h-((h/max)*a[u-1][0])-y;}
+				if(u==0){var ih = h-y;}
 
-        ctx.drawImage(canvasl, x, y, iw, ih);
+				ctx.imageSmoothingQuality = 'high';
+				ctx.drawImage(canvasl, x, y, iw, ih);
       }
     }
 
@@ -513,18 +516,54 @@ function logo(M, max) {
 
       ctx.save();
       ctx.translate(0, 32);
-      ctx.font = "30px Arial";
+      ctx.font = "20px Arial";
       ctx.fillStyle = "#000000";
       ctx.textAlign = "left";
-      ctx.fillText('Max', 0, 0);
+      ctx.fillText('Bits', 0, 0);
       ctx.restore();
 
       ctx.save();
-      ctx.translate(40, h + 15);
-      ctx.font = "30px Arial";
+      ctx.translate(40, h + 12);
+      ctx.font = "20px Arial";
       ctx.fillStyle = "#000000";
       ctx.textAlign = "left";
       ctx.fillText('0', 0, 0);
+      ctx.restore();
+	  
+	  
+      ctx.save();
+      ctx.translate(40, h -35);
+      ctx.font = "20px Arial";
+      ctx.fillStyle = "#000000";
+      ctx.textAlign = "left";
+      ctx.fillText('1', 0, 0);
+      ctx.restore();
+	  
+	  
+      ctx.save();
+      ctx.translate(40, h - 85);
+      ctx.font = "20px Arial";
+      ctx.fillStyle = "#000000";
+      ctx.textAlign = "left";
+      ctx.fillText('2', 0, 0);
+      ctx.restore();
+	  
+	 
+      ctx.save();
+      ctx.translate(40, h -132);
+      ctx.font = "20px Arial";
+      ctx.fillStyle = "#000000";
+      ctx.textAlign = "left";
+      ctx.fillText('3', 0, 0);
+      ctx.restore();
+	   
+	  
+      ctx.save();
+      ctx.translate(40, h -180);
+      ctx.font = "20px Arial";
+      ctx.fillStyle = "#000000";
+      ctx.textAlign = "left";
+      ctx.fillText('4', 0, 0);
       ctx.restore();
     }
   }

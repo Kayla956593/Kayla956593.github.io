@@ -209,7 +209,11 @@ function getLatLon(){
     const selectedCity = cityData[this.value];
     GetWeather(selectedCity.lat, selectedCity.lon); 
 
-  } 
+  }
+  
+  // Assuming you have a change event listener on the dropdown element
+//   $("#cityDropdown").on("change", loadServerData);
+  
 
 //GetWeather函数通过使用OpenWeatherMap API来获取指定经纬度位置的天气信息，
 //并将结果显示在页面上。

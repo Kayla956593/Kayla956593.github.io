@@ -2529,7 +2529,7 @@ h3 {
   padding: 15px;
 }
 .resume .func .skills-prog ul {
-  margin-left: 47px;
+  margin-left: 45px;
 }
 .resume .func .skills-prog ul li {
   margin-bottom: 8px;

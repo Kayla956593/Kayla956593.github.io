@@ -2529,7 +2529,7 @@ h3 {
   padding: 15px;
 }
 .resume .func .skills-prog ul {
-  margin-left: 45px;
+  margin-left: 47px;
 }
 .resume .func .skills-prog ul li {
   margin-bottom: 8px;
@@ -2640,10 +2640,10 @@ h3 {
   transition-duration: 0.3s;
 }
 .resume .func .interests-items div i {
-  font-size: 45px;
+  font-size: 40px;
   width: 60px;
   height: 60px;
-  line-height: 60px;
+  line-height: 50px;
   color: orange;
   transition-duration: 0.3s;
 }

@@ -1300,7 +1300,7 @@ input, select, textarea {
 	}
 
 	body {
-		background-image: url("images/overlay.png"), url("images/bg.jpg");
+		background-image: url("images/overlay.png"), url("images/bg.jpg"); 
 		background-repeat: repeat, no-repeat;
 		background-size: auto, 100% 100%;
 		background-attachment: fixed;
@@ -2211,19 +2211,17 @@ input, select, textarea {
 		
 		@import url("https://fonts.googleapis.com/css?family=Montserrat");
 
-$#00008b: #1a237e;
-#00008B: #283593;
+$#871282: #1a237e;
+#871282: #283593;
 $#3545A7: #303f9f;
 $medium-blue: #3949ab;
 $light-blue: #3f51b5;
 $lighter-blue: #5c6bc0;
 $lightest-blue: #9fa8da;
 white: #ffffff;
-$black: #0e1442;
-orange: #ffb300;
-yellow: #fdd835;
-$dark-pink: #ad1457;
-$light-pink: #d81b60;
+$black: #0e1442; 
+$dark-yellow: #ad1457;
+$light-yellow: #d81b60;
 
 @charset "UTF-8";
 * {
@@ -2254,13 +2252,14 @@ h2 {
 }
 
 h3 {
-  color: orange;
+  color: white;
   margin: 10px 0;
   text-transform: lowercase;
   font-size: 1.2em;
 }
 
 .resume { 
+
   color: white;
   margin: 20px auto; 
   position: relative;
@@ -2268,6 +2267,7 @@ h3 {
 }
 .resume .base,
 .resume .func {
+	   
   box-sizing: border-box;
   float: left;
 }
@@ -2280,13 +2280,16 @@ h3 {
   padding-bottom: 0;
 }
 .resume .base {
+  border-radius: 12px;
   width: 30%;
   padding: 30px 15px;
-  background: #00008B;
+  background: #871282;
   color: white;
 }
-.resume .base .profile {
-  background: orange;
+.resume .base .profile { 
+  border-top-right-radius: 12px;
+  border-top-left-radius: 12px;
+  background: #ffebad;
   padding: 30px 15px 40px 15px;
   margin: -30px -15px 45px -15px;
   position: relative;
@@ -2295,7 +2298,7 @@ h3 {
 .resume .base .profile::after {
   content: "";
   position: absolute;
-  background: #3545A7;
+  background: 	#ffe755;
   width: 100%;
   height: 30px;
   bottom: -15px;
@@ -2316,7 +2319,7 @@ h3 {
   font-size: 100px;
   text-align: center;
   margin: auto;
-  color: #00008B;
+  color: #871282;
 }
 .resume .base .profile .info {
   text-align: center;
@@ -2327,14 +2330,14 @@ h3 {
   margin-bottom: 0;
   font-size: 1.2em;
   text-transform: lowercase;
-  color: #00008b;
+  color: #871282;
 }
 .resume .base .profile .info .job {
   margin-top: 10px;
   margin-bottom: 0;
   font-size: 1.1em;
   text-transform: lowercase;
-  color: #00008B;
+  color: #871282;
 }
 .resume .base .contact div {
   line-height: 35px;
@@ -2349,7 +2352,7 @@ h3 {
   color: yellow;
 }
 .resume .base .contact div i {
-  color: orange;
+  color: #ffebad;
   width: 20px;
   height: 20px;
   font-size: 20px;
@@ -2390,12 +2393,12 @@ h3 {
 .resume .base .follow .box i {
   display: inline-block;
   font-size: 30px;
-  background: orange;
+  background: #ffebad;
   width: 60px;
   height: 60px;
   border-radius: 50%;
   line-height: 60px;
-  color: #00008B;
+  color: #871282;
   margin: 0 10px 10px 10px;
   transition-duration: 0.3s;
 }
@@ -2423,8 +2426,8 @@ h3 {
   margin-top: 0;
 }
 .resume .func h3 i {
-  color: #00008B;
-  background: orange;
+  color: #871282;
+  background: #ffebad;
   width: 42px;
   height: 42px;
   font-size: 20px;
@@ -2437,6 +2440,7 @@ h3 {
 }
 .resume .func .work,
 .resume .func .edu {
+  border-radius: 12px;
   float: left;
 }
 .resume .func .work small,
@@ -2494,7 +2498,7 @@ h3 {
   width: 7px;
   height: 7px;
   border: 3px solid white;
-  background: orange;
+  background: #ffebad;
   border-radius: 50%;
   left: 3px;
   z-index: 1;
@@ -2513,18 +2517,19 @@ h3 {
 }
 .resume .func .work {
   width: 48%;
-  background: #00008B;
+  background: #871282;
   padding: 15px;
   margin: 0 4% 15px 0;
 }
 .resume .func .edu {
   width: 48%;
-  background: #00008B;
+  background: #871282;
   padding: 15px;
 }
 .resume .func .skills-prog {
+  border-radius: 12px;
   clear: both;
-  background: #00008B;
+  background: #871282;
   padding: 15px;
 }
 .resume .func .skills-prog ul {
@@ -2558,13 +2563,14 @@ h3 {
   position: absolute;
   top: -1px;
   height: 4px;
-  background: orange;
-  box-shadow: 0 0 0 orange;
+  background: #ffebad;
+  box-shadow: 0 0 0 #ffebad;
   border-radius: 5px;
 }
 .resume .func .skills-soft {
+  border-radius: 12px;
   clear: both;
-  background: #00008B;
+  background: #871282;
   padding: 15px;
   margin: 15px 0 0;
 }
@@ -2595,7 +2601,7 @@ h3 {
 }
 .resume .func .skills-soft ul li svg .cbar {
   stroke-width: 3px;
-  stroke: orange;
+  stroke: #ffebad;
   stroke-linecap: round;
 }
 .resume .func .skills-soft ul li span,
@@ -2610,7 +2616,8 @@ h3 {
   top: 30%;
 }
 .resume .func .interests {
-  background: #00008B;
+  border-radius: 12px;
+  background: #871282;
   margin: 15px 0 0;
   padding: 15px;
 }
@@ -2643,9 +2650,13 @@ h3 {
   width: 60px;
   height: 60px;
   line-height: 50px;
-  color: orange;
+  color: #ffebad;
   transition-duration: 0.3s;
 }
 .resume .func .interests-items div span {
   display: block;
+}
+
+.row div a{
+	color:black;
 }

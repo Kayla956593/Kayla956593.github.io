@@ -1,0 +1,828 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Saturn Ring Cards — Glow</title>
+<a href="https://www.linkedin.com/in/kayla-liao-a9a958277/" target="_blank" id="linkedin-btn">
+  <span>LINKEDIN</span>
+</a>
+  <style>
+    html,body{height:100%;margin:0;overflow:hidden;background:#0a0e12}
+    #hud{position:fixed;left:24px;bottom:24px;color:#b7c7ff;font:12px monospace;opacity:.7}
+    canvas{display:block}
+	
+  #linkedin-btn {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 9999;
+    padding: 8px 14px;
+    border-radius: 12px;
+    backdrop-filter: blur(6px) saturate(180%);
+    background-color: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    text-decoration: none; /* 去掉底線 */
+    font-family: 'Segoe UI', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    color: white;
+    letter-spacing: 0.5px;
+    transition: all 0.25s ease;
+  }
+  #linkedin-btn:hover {
+    background-color: rgba(255, 255, 255, 0.18);
+    box-shadow: 0 0 12px rgba(0, 172, 238, 0.6);
+    transform: translateY(-2px);
+  }
+  </style>
+
+  <!-- import map：讓 'three' 與 addons 在瀏覽器可用 -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="hud">Scroll or swipe to rotate the ring…</div>
+  <canvas id="webgl"></canvas>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+    import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+    import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+	// for Cards
+	import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+	import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+	//
+	import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+
+	const GradeShader = {
+	  uniforms: {
+		tDiffuse: { value: null },
+		vignette: { value: 0.35 },   // 0~1 越大越暗角
+    lift:{value:0.00},      // ↓ 不抬暗部，避免霧灰
+    gain:{value:1.00},      // ↓ 不增高光，避免泛白
+    sat:{value:1.08},       // ↑ 稍回飽和
+		grainAmp: { value: 0.025 },  // 顆粒強度
+		abAmt:{value:0.0},      // 關色差，避免彩邊
+		time:     { value: 0 }
+	  },
+	  vertexShader: /* glsl */`
+		varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }
+	  `,
+	  fragmentShader: /* glsl */`
+		uniform sampler2D tDiffuse; uniform float vignette,lift,gain,sat,grainAmp,abAmt,time;
+		varying vec2 vUv;
+		float hash(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7))+time*12.9898)*43758.5453); }
+		vec3 grade(vec3 c){
+		  c = mix(vec3(0.), c, 1.0-lift) * gain;               // lift / gain
+		  float l = dot(c, vec3(0.2126,0.7152,0.0722));         // luminance
+		  c = mix(vec3(l), c, sat);                             // saturation
+		  float v = smoothstep(1., 0.2, length(vUv-0.5))*vignette; // vignette
+		  return c*(1.0-v);
+		}
+		void main(){
+		  // 微色差：對 RGB 取樣位移不同
+		  vec2 off = abAmt * (vUv-0.5);
+		  vec3 col;
+		  col.r = texture2D(tDiffuse, vUv + off).r;
+		  col.g = texture2D(tDiffuse, vUv).g;
+		  col.b = texture2D(tDiffuse, vUv - off).b;
+
+		  // 顆粒（動態）
+		  float g = (hash(vUv*vec2(640.0,360.0)) - 0.5) * grainAmp;
+		  col += g;
+
+		  gl_FragColor = vec4(grade(col), 1.0);
+    }
+  `
+};
+
+    // ---------- renderer / scene / camera ----------
+    const canvas = document.getElementById('webgl');
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias:true });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(42, innerWidth/innerHeight, 0.1, 100);
+    camera.position.set(0, 0, 3.2);
+    camera.lookAt(0, 10, 0);
+	
+	// 物理正確光照 + 環境反射來源
+	renderer.physicallyCorrectLights = true; // 保險起見
+	const pmrem = new THREE.PMREMGenerator(renderer);
+	const envTex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+	scene.environment = envTex;   // 提供反射/折射環境
+	// scene.background = envTex; // 若想把背景也換成 HDR，可解開；你現在用漸層就留著
+
+    // ---------- postprocessing ----------
+    const composer = new EffectComposer(renderer);
+    composer.addPass(new RenderPass(scene, camera));// 原本：0.85, 0.8, 0.22
+	const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.45, 0.6, 1.05);
+
+	// ★ 新增顏色分級與微色差
+	const gradePass = new ShaderPass(GradeShader);
+	composer.addPass(gradePass);
+    composer.addPass(bloom);
+
+    addEventListener('resize', () => {
+      camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+      composer.setSize(innerWidth, innerHeight);
+      bloom.setSize(innerWidth, innerHeight);
+    });
+
+    // ---------- lights ----------
+    // 曝光再低一點（整體不會爆）
+	renderer.toneMappingExposure = 0.7; // 原本 1.1
+
+	// 光線：用更柔的組合
+	// 1) 一點環境光就好
+	const ambient = new THREE.AmbientLight(0xffffff, 0.4); // 原 0.9 → 0.22
+	scene.add(ambient);
+
+	// 2) 主光較弱、偏高偏右
+	const dir = new THREE.DirectionalLight(0xffffff, 1);  // 原 2.0 → 0.9
+	dir.position.set(3, 6, 6);
+	scene.add(dir);
+
+	// 3) 補光更弱，只提細節
+	const fill = new THREE.DirectionalLight(0xffffff, 0.5); // 原 0.6 → 0.35
+	fill.position.set(-6, -2, -4);
+	scene.add(fill);
+
+	// （可選）加一盞半球光讓陰影更柔和
+	const hemi = new THREE.HemisphereLight(0x9ecaff, 0x0a0e12, 0.6);
+	scene.add(hemi);
+
+    // ---------- center "spine" ----------
+	const spine = makeDNA({
+	  height: 20,   // 依你的畫面微調
+	  turns: 7,
+	  radius: 0.5
+	});
+	scene.add(spine);
+	
+    // particles
+    const pGeo = new THREE.BufferGeometry();
+    const COUNT = 1000, positions = new Float32Array(COUNT*3);
+    for (let i=0;i<COUNT;i++){
+      const r = 6 + (Math.random()-0.5)*3;
+      const a = Math.random()*Math.PI*2;
+      const y = (Math.random()-0.5)*7;
+      positions[i*3+0] = Math.cos(a)*r;
+      positions[i*3+1] = y;
+      positions[i*3+2] = Math.sin(a)*r;
+    }
+    pGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    const pMat = new THREE.PointsMaterial({ size:0.035, transparent:true, opacity:.6, color:0xa6e1ff });
+    const pts = new THREE.Points(pGeo, pMat); scene.add(pts);
+	
+// ---------- watercolor dots (billboard instanced, visible through glass) ----------
+const PCOUNT = 9000;
+const H = spine.userData.height || 20;
+const R_MIN = 0.2, R_MAX = 1.5;
+
+// 每顆的屬性
+const aOffset = new Float32Array(PCOUNT * 3);
+const aSize   = new Float32Array(PCOUNT);
+const aHue    = new Float32Array(PCOUNT);
+const aSeed   = new Float32Array(PCOUNT);
+
+for (let i = 0; i < PCOUNT; i++) {
+  const r = THREE.MathUtils.lerp(R_MIN, R_MAX, Math.random());
+  const a = Math.random() * Math.PI * 2;
+  const t = (i + Math.random()) / PCOUNT;
+  const y = THREE.MathUtils.lerp(-H * 0.5, H * 0.5, t);
+
+  aOffset[i*3+0] = Math.cos(a) * r;
+  aOffset[i*3+1] = y;
+  aOffset[i*3+2] = Math.sin(a) * r;
+
+  aSize[i] = THREE.MathUtils.lerp(0.2, 0.2, Math.random()); // 你的尺寸邏輯
+  aHue[i]  = Math.random();
+  aSeed[i] = Math.random() * 1000.0;
+}
+
+// 單位平面（UV 0..1），用 shader 做 billboard
+const quadGeo = new THREE.PlaneGeometry(1, 1, 1, 1);
+quadGeo.setAttribute('aSize',  new THREE.InstancedBufferAttribute(aSize, 1));
+quadGeo.setAttribute('aHue',   new THREE.InstancedBufferAttribute(aHue, 1));
+quadGeo.setAttribute('aSeed',  new THREE.InstancedBufferAttribute(aSeed, 1));
+quadGeo.setAttribute('aOffset',new THREE.InstancedBufferAttribute(aOffset, 3));
+
+const WatercolorBillboardMat = new THREE.ShaderMaterial({
+  uniforms: {
+    uTime:      { value: 0.0 },
+    uPulseAmp:  { value: 0.12 },
+    uPulseFreq: { value: 0.9 },
+    uCamRight:  { value: new THREE.Vector3() }, // 相機右向（世界座標）
+    uCamUp:     { value: new THREE.Vector3() }, // 相機上向
+  },
+  vertexShader: /* glsl */`
+    attribute float aSize, aHue, aSeed;
+    attribute vec3  aOffset;
+    varying float vHue, vSeed;
+    varying vec2  vUv2;
+    uniform float uTime, uPulseAmp, uPulseFreq;
+    uniform vec3  uCamRight, uCamUp;
+
+    // 將 quad 的頂點 (-0.5..0.5) 轉為世界空間的 billboard
+    void main(){
+      vHue  = aHue; 
+      vSeed = aSeed;
+      vUv2 = uv;
+
+      // 呼吸尺寸
+      float pulse = 1.0 + uPulseAmp * sin(uTime*(6.2831853*uPulseFreq) + aSeed*6.2831853);
+
+      // quad 頂點（-0.5..0.5）
+      vec2 v = (position.xy); // PlaneGeometry 已是 -0.5..0.5
+      float size = aSize * 0.09 * pulse; // 對齊你原本 uSizeScale=22
+
+      // 相機對齊的 billboard 偏移（世界座標）
+      vec3 right = normalize(uCamRight);
+      vec3 up    = normalize(uCamUp);
+      vec3 billboard = right * v.x * size + up * v.y * size;
+
+      // 將中心位移 aOffset 套上父層 modelMatrix（讓它跟著 spine 轉）
+      vec4 centerWorld = modelMatrix * vec4(aOffset, 1.0);
+      vec3 worldPos = centerWorld.xyz + billboard;
+
+      gl_Position = projectionMatrix * viewMatrix * vec4(worldPos, 1.0);
+    }
+  `,
+  fragmentShader: /* glsl */`
+    precision highp float;
+    varying float vHue, vSeed;
+    varying vec2  vUv2;
+
+    float hash(vec2 p){
+      p = vec2(dot(p, vec2(127.1,311.7)), dot(p, vec2(269.5,183.3)));
+      return fract(sin(p.x+p.y) * 43758.5453);
+    }
+    float noise(vec2 p){
+      vec2 i=floor(p), f=fract(p);
+      float a=hash(i), b=hash(i+vec2(1.,0.)), c=hash(i+vec2(0.,1.)), d=hash(i+vec2(1.,1.));
+      vec2 u=f*f*(3.-2.*f);
+      return mix(mix(a,b,u.x), mix(c,d,u.x), u.y);
+    }
+    float fbm(vec2 p){
+      float t=0., amp=.5;
+      for(int i=0;i<5;i++){ t+=noise(p)*amp; p*=2.; amp*=.5; }
+      return t;
+    }
+
+    vec3 hsl2rgb(float h,float s,float l){
+      float c=(1.-abs(2.*l-1.))*s, x=c*(1.-abs(mod(h*6.,2.)-1.)), m=l-.5*c; vec3 rgb;
+      if(h<1./6.) rgb=vec3(c,x,0.); else if(h<2./6.) rgb=vec3(x,c,0.);
+      else if(h<3./6.) rgb=vec3(0.,c,x); else if(h<4./6.) rgb=vec3(0.,x,c);
+      else if(h<5./6.) rgb=vec3(x,0.,c); else rgb=vec3(c,0.,x);
+      return rgb+m;
+    }
+	// 0..1 hash（用 seed 取樣）
+	float rand1(float x){
+	  return fract(sin(x*1234.567 + 0.123)*43758.5453);
+	}
+
+	// 浪漫水彩調色盤（加權 + 輕微抖動）
+	vec3 romanticColor(float id, float seed){
+  // HEX → sRGB(0..1)
+  vec3 P[9];
+  P[0]=vec3(0.988,0.643,0.706); // #fca4b4  粉紅
+  P[1]=vec3(0.937,0.337,0.494); // #ef567e  玫瑰
+  P[2]=vec3(0.866,0.219,0.333); // #dd3855  紅
+  P[3]=vec3(0.702,0.396,0.784); // #b366c8  莓紫
+  P[4]=vec3(0.541,0.309,0.690); // #8a4faf  葡萄紫
+  P[5]=vec3(0.247,0.333,0.659); // #3f55a8  夜藍
+  P[6]=vec3(0.129,0.211,0.431); // #21366e  深夜藍
+  P[7]=vec3(0.686,0.655,0.388); // #afa761  金橄欖
+  P[8]=vec3(0.820,0.765,0.569); // #d1c391  暖米金
+
+  // 權重（總和≈1）：粉/玫瑰/紅 0.45、紫系 0.25、夜藍 0.20、橄欖/米金 0.10
+  float t = rand1(id*97.0 + seed*0.37);
+  int idx =
+    (t < 0.18) ? 0 :       // 粉
+    (t < 0.33) ? 1 :       // 玫瑰
+    (t < 0.45) ? 2 :       // 紅
+    (t < 0.58) ? 3 :       // 莓紫
+    (t < 0.70) ? 4 :       // 葡萄紫
+    (t < 0.82) ? 5 :       // 夜藍
+    (t < 0.90) ? 6 :       // 深夜藍
+    (t < 0.95) ? 7 : 8;    // 橄欖 / 米金（點綴）
+
+  vec3 c = P[idx];
+
+  // 微抖動，避免死板，但限制幅度防螢光
+  float j = (rand1(seed+8.0)-0.5);
+  c += vec3(j*0.06, j*0.06, j*0.06); // 明度微擾
+  c = clamp(c, 0.0, 1.0);
+
+  return c;
+	}
+
+    void main(){
+      // 將平面的 uv 當作圓點的座標
+      vec2 uv = vUv2;
+      vec2 p  = uv*2.0 - 1.0;
+      float r = length(p);
+
+      float n = fbm(uv*3.5 + vSeed);
+      float edge = 0.50 + (n-0.5)*0.26;
+      float body = smoothstep(edge, edge-0.10, r);
+      float grain = fbm(uv*14.0 + vSeed*1.7);
+      float ink = body * (0.86 + (grain-0.5)*0.22);
+	  vec3 C = romanticColor(vHue, vSeed);
+	/* sRGB -> Linear，否則會顯暗、發灰 */
+		//C = pow(C, vec3(2.2));// 在輸出前
+		C = mix(vec3(0.08), C, 0.9); // 微 lift（暗部提一點點）
+		C *= 1.1;                    // 輕 gain（別超過 1.2）
+		C = clamp(C, 0.0, 1.0);
+
+      float alpha = ink * 0.62;
+
+      // 用 alphaTest/discard 做柔邊，但材質本身是不透明材質 → 能進 transmission 背景
+      if (alpha < 0.06) discard;
+
+		gl_FragColor = vec4(C, 1.0);
+    }
+  `,
+  // 關鍵：不透明 + alphaTest（discard）→ 會被玻璃的 transmission 當背景捕捉
+  transparent: false,
+  alphaTest: 0.4,
+  depthWrite: true,
+  depthTest: true,
+  toneMapped: false
+});
+
+const watercolors = new THREE.InstancedMesh(quadGeo, WatercolorBillboardMat, PCOUNT);
+watercolors.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+watercolors.frustumCulled = false;
+watercolors.renderOrder = -100;   // 先畫，讓玻璃能抓到它當背景
+spine.add(watercolors);
+
+// ★ 把位置+朝相機的朝向，烤進 instanceMatrix
+const dummy = new THREE.Object3D();
+function bakeInstancesFaceCamera(){
+  const cq = camera.quaternion;                      // 每顆都面向相機
+  for (let i = 0; i < PCOUNT; i++){
+    dummy.position.set(aOffset[i*3+0], aOffset[i*3+1], aOffset[i*3+2]);
+    dummy.quaternion.copy(cq);
+    dummy.scale.set(1,1,1);
+    dummy.updateMatrix();
+    watercolors.setMatrixAt(i, dummy.matrix);
+  }
+  watercolors.instanceMatrix.needsUpdate = true;
+}
+bakeInstancesFaceCamera(); // 初始化先烤一次
+
+//scene.add(watercolors);
+	// === DNA 產生器（雙股螺旋 + 珠珠 + 橫桿，皆用 InstancedMesh）===
+	function makeDNA({
+	  height = 5.6,
+	  turns  = 4,
+	  radius = 0.4,
+	  beadR  = 0.14,
+	  rungStep = 0.36,
+	  backboneR = 0.035
+	} = {}) {
+	  const g = new THREE.Group();
+
+	  class HelixCurve extends THREE.Curve {
+		constructor(phase=0){ super(); this.phase=phase; }
+		getPoint(t){
+		  const theta = t * turns * Math.PI * 2 + this.phase;
+		  const y = (t - 0.5) * height;
+		  return new THREE.Vector3(Math.cos(theta)*radius, y, Math.sin(theta)*radius);
+		}
+	  }
+	  const segs = 400;
+	  const curveA = new HelixCurve(0);
+	  const curveB = new HelixCurve(Math.PI);
+
+	  // 主幹
+	  const backboneMat = new THREE.MeshPhysicalMaterial({
+		color: 0x8ea4b5, metalness: 0.2, roughness: 0.45,
+		clearcoat: 0.6, clearcoatRoughness: 0.25, envMapIntensity: 0.7
+	  });
+	  g.add(new THREE.Mesh(new THREE.TubeGeometry(curveA, segs, backboneR, 14, false), backboneMat));
+	  g.add(new THREE.Mesh(new THREE.TubeGeometry(curveB, segs, backboneR, 14, false), backboneMat.clone()));
+
+	  // === 讓「珠珠」與「橫槓」用同一個取樣 ===
+	  const rungCount = Math.floor(height / rungStep) + 1;
+	  const tAt = (i) => (i / (rungCount - 1));   // 0..1
+
+	  // 珠珠（與橫槓同數量、同 t）
+	  const beadGeo = new THREE.SphereGeometry(beadR, 24, 16);
+	  const redMat  = new THREE.MeshPhysicalMaterial({ color: 0xd94a4a, metalness:0.15, roughness:0.35, clearcoat:0.7, clearcoatRoughness:0.25, envMapIntensity:0.6 });
+	  const blueMat = new THREE.MeshPhysicalMaterial({ color: 0x3aa0ff, metalness:0.15, roughness:0.35, clearcoat:0.7, clearcoatRoughness:0.25, envMapIntensity:0.6 });
+	  const beadsA = new THREE.InstancedMesh(beadGeo, redMat,  rungCount);
+	  const beadsB = new THREE.InstancedMesh(beadGeo, blueMat, rungCount);
+
+	  const dummy = new THREE.Object3D();
+	  for (let i=0;i<rungCount;i++){
+		const t = tAt(i);
+		dummy.position.copy(curveA.getPoint(t)); dummy.updateMatrix(); beadsA.setMatrixAt(i, dummy.matrix);
+		dummy.position.copy(curveB.getPoint(t)); dummy.updateMatrix(); beadsB.setMatrixAt(i, dummy.matrix);
+	  }
+	  beadsA.instanceMatrix.needsUpdate = true;
+	  beadsB.instanceMatrix.needsUpdate = true;
+	  g.add(beadsA, beadsB);
+
+	  // 橫槓（A→B，長度扣掉兩顆珠珠半徑）
+	  const rungGeo = new THREE.CylinderGeometry(0.02, 0.02, 1, 12); // 半徑可再調
+	  const rungMat = new THREE.MeshPhysicalMaterial({ color: 0xcfe6ff, metalness:0.1, roughness:0.5, envMapIntensity:0.5 });
+	  const rungs = new THREE.InstancedMesh(rungGeo, rungMat, rungCount);
+
+	  const up = new THREE.Vector3(0,1,0);
+	  const a = new THREE.Vector3(), b = new THREE.Vector3(), mid = new THREE.Vector3();
+	  for (let i=0;i<rungCount;i++){
+		const t = tAt(i);
+		a.copy(curveA.getPoint(t));
+		b.copy(curveB.getPoint(t));
+		mid.addVectors(a,b).multiplyScalar(0.5);
+
+		const dir = b.clone().sub(a);
+		const len = Math.max(dir.length() - beadR*2, 0.001);
+		dir.normalize();
+
+		dummy.position.copy(mid);
+		dummy.quaternion.setFromUnitVectors(up, dir); // Y 軸對齊 A→B
+		dummy.scale.set(1, len, 1);                   // 把圓柱拉成正確長度
+		dummy.updateMatrix();
+		rungs.setMatrixAt(i, dummy.matrix);
+	  }
+	  rungs.instanceMatrix.needsUpdate = true;
+	  g.add(rungs);
+
+	  // 讓外面知道 DNA 的高度，供水彩點 y 分布使用
+	  g.userData.height = height;
+	  return g;
+	}
+
+const BIOS = [
+  "Born in Taiwan, 2001.\nIve always been drawn to\nsolving problems\nand creating things that are\nbeautiful, functional, and meaningful.",
+  "HI, IM KAYLA.\nSoftware & Security Engineer\nI design secure systems and\ncraft interactive 3D experiences.\nScroll, Ill take you through my journey",
+  "If my work sparks your interest,\nlets grab a ☕ and talk ideas.\nId love to explore how I can\nbring value to your team.",
+  "My expertise spans security,\nbackend systems, and\ninteractive design.\nFrom protecting data to ideas —\nI bridge technology and creativity.",
+  "This website —\nincluding the DNA in the background was built from scratch with WebGL.\nI design visuals, code the logic,\nand bring everything to life."
+];
+
+
+	function makeLabelTexture(text, opts = {}) {
+	  const {
+		width = 1024,        // 紋理寬
+		padding = 64,        // 內距
+		font = '600 52px "Noto Sans TC", system-ui, -apple-system, Segoe UI, Roboto, "PingFang TC", "Microsoft JhengHei", Helvetica, Arial',
+		lineHeight = 1.25,
+		color = '#EAF2FF',
+		align = 'left',
+		shadow = 'rgba(0,0,0,0.35)'
+	  } = opts;
+
+	  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+	  const c = document.createElement('canvas');
+	  const ctx = c.getContext('2d');
+
+	  // 暫定高度，稍後按行數重設
+	  c.width = Math.floor(width * dpr);
+
+	  ctx.font = font.replace(/\d+px/, m => (parseInt(m) * dpr) + 'px');
+	  ctx.textBaseline = 'top';
+	  ctx.fillStyle = color;
+	  ctx.shadowColor = shadow;
+	  ctx.shadowBlur = 8 * dpr;
+
+	  const maxTextWidth = c.width - Math.floor(padding * 2 * dpr);
+
+	  // 逐字換行（中英都適用）
+	  const lines = [];
+	  let line = '';
+	  for (const ch of text) {
+		const test = line + ch;
+		if (ch === '\n') { lines.push(line); line = ''; continue; }
+		const w = ctx.measureText(test).width;
+		if (w > maxTextWidth) { lines.push(line); line = ch; }
+		else { line = test; }
+	  }
+	  if (line) lines.push(line);
+
+	  const fontSizePx = parseInt((font.match(/(\d+)px/)||[])[1] || 48, 10);
+	  const lh = fontSizePx * lineHeight * dpr;
+	  const topPad = padding * dpr;
+	  const height = Math.ceil(topPad*2 + lh * lines.length);
+
+	  c.height = height; // 依實際行數重設高度
+	  // 需重設字體/樣式
+	  ctx.font = font.replace(/\d+px/, m => (parseInt(m) * dpr) + 'px');
+	  ctx.textBaseline = 'top';
+	  ctx.fillStyle = color;
+	  ctx.shadowColor = shadow;
+	  ctx.shadowBlur = 8 * dpr;
+
+	  const xBase =
+		align === 'center' ? c.width/2 :
+		align === 'right'  ? c.width - padding*dpr :
+							 padding*dpr;
+
+	  for (let i=0; i<lines.length; i++) {
+		const y = topPad + i * lh;
+		let x = xBase;
+		if (align !== 'left') {
+		  const w = ctx.measureText(lines[i]).width;
+		  x = align === 'center' ? xBase - w/2 : xBase - w;
+		}
+		ctx.fillText(lines[i], x, y);
+	  }
+
+	  const tex = new THREE.CanvasTexture(c);
+	  tex.colorSpace = THREE.SRGBColorSpace;
+	  tex.anisotropy = 8;
+	  tex.needsUpdate = true;
+	  return tex;
+	}
+
+    // ---------- cards ring (Saturn style) ----------
+    const ring = new THREE.Group(); scene.add(ring);
+    const CARD_W = 1, CARD_H = 0.5;
+    const RADIUS = 1.5;         // 環靠近脊椎
+    const N = 5;
+    const cards = [];
+
+	function makeCard(labelText = "") {
+	const g = new THREE.Group();
+
+  // 1) 正面玻璃：只有 FrontSide
+  const glassFront = new THREE.MeshPhysicalMaterial({
+    color: 0xcfe6ff,
+    transmission: 1.0,
+    transparent: true,
+	thickness: 0.06,        // 薄一點，顏色更清楚
+    ior: 1.52,
+	roughness: 0.25,        // 0.2~0.35 之間好看
+    metalness: 0.0,
+    clearcoat: 0.0,           // 不要鍍膜反光
+    specularIntensity: 0.0,   // 關掉鏡面
+    envMapIntensity: 0.0,     // 完全不吃環境反射
+    attenuationColor: new THREE.Color(0xaed8ff),
+    attenuationDistance: 2.5, // 稍短，邊緣會更暗一點
+    side: THREE.FrontSide
+  });
+
+  // 2) 背面磨砂板：Basic + 半透明，完全不受燈光/曝光
+  const backMat = new THREE.MeshBasicMaterial({
+    color: 0x162029,          // 偏暗藍灰
+    transparent: true,
+    opacity: 0.28,
+    side: THREE.BackSide,
+    depthWrite: false,        // 避免把文字/邊線蓋掉
+    toneMapped: false
+  });
+
+  const bodyFront = new THREE.Mesh(
+    new RoundedBoxGeometry(CARD_W, CARD_H, 0.08, 6, Math.min(CARD_W,CARD_H)*0.08),
+    glassFront
+  );
+  const bodyBack = new THREE.Mesh(bodyFront.geometry, backMat.clone());
+bodyBack.visible = false;      
+  g.add(bodyFront);
+  g.add(bodyBack);
+
+  // 3) Fresnel 邊線：改為普通混合、只畫正面，並限制強度
+  const rimMat = new THREE.ShaderMaterial({
+    uniforms: {
+      color:{value:new THREE.Color(0xbfe4ff)},
+      intensity:{value:0.22},      // 降低
+      power:{value:1.4},
+      maxAlpha:{value:0.35}        // 上限，避免變白
+    },
+    vertexShader: `
+      varying vec3 vN; varying vec3 vV;
+      void main(){
+        vec4 mv = modelViewMatrix * vec4(position,1.0);
+        vN = normalize(normalMatrix * normal);
+        vV = normalize(-mv.xyz);
+        gl_Position = projectionMatrix * mv;
+      }
+    `,
+    fragmentShader: `
+      uniform vec3 color; uniform float intensity; uniform float power; uniform float maxAlpha;
+      varying vec3 vN; varying vec3 vV;
+      void main(){
+        float f = pow(1.0 - max(dot(normalize(vN), normalize(vV)), 0.0), power);
+        float a = min(f * intensity, maxAlpha);
+        // 僅正面：gl_FrontFacing 為 false 時讓 alpha = 0
+        a *= float(gl_FrontFacing);
+        gl_FragColor = vec4(color, a);
+      }
+    `,
+    transparent:true,
+    depthWrite:false,
+    blending: THREE.NormalBlending, // ← 不再加色
+    side: THREE.FrontSide
+  });
+  const rim = new THREE.Mesh(
+    new RoundedBoxGeometry(CARD_W*1.002, CARD_H*1.002, 0.0805, 6, Math.min(CARD_W,CARD_H)*0.08),
+    rimMat
+  );
+  g.add(rim);
+  
+
+	  // ★ 文字貼片（透明、避免 Bloom）
+	  const labelTex = makeLabelTexture(labelText, {
+		width: 1024,
+		padding: 56,
+		font: '600 48px "Noto Sans TC", system-ui, -apple-system, Segoe UI, Roboto, "PingFang TC", "Microsoft JhengHei", Helvetica, Arial',
+		lineHeight: 1.26,
+		color: '#EAF2FF',
+		align: 'left'
+	  });
+	  
+	  const labelMat = new THREE.MeshBasicMaterial({
+		map: labelTex,
+		transparent: true,
+		opacity: 0.85,
+		side: THREE.DoubleSide,
+		toneMapped: false   // ★ 不進 tone mapping/Bloom，避免像電視
+	  });
+	  const label = new THREE.Mesh(
+		new THREE.PlaneGeometry(CARD_W - 0.28, CARD_H - 0.28),
+		labelMat
+	  );
+	  label.position.z = 0.045;         // 貼在玻璃內側
+	  g.add(label);
+
+	  // 之後在 tick() 可用來淡入淡出
+	  g.userData.labelMat = labelMat;
+	  label.position.z = -0.041;   // 如果還是看不到，改成 +0.041 試
+	  label.rotation.y = Math.PI;  // 讓字不要鏡像（必要時）
+	  label.material.depthWrite = false;
+	  label.material.polygonOffset = true;
+	  label.material.polygonOffsetFactor = -2;
+	  label.material.polygonOffsetUnits  = -2; 
+// 標籤：避免擋到玻璃的背景抓取
+//label.material.depthTest = false; 
+label.renderOrder = 999;       // 讓它最後疊上來
+
+	  return g;
+	}
+    //for (let i=0;i<N;i++){ const c = makeCard(); ring.add(c); cards.push(c); }
+	for (let i=0;i<N;i++){
+	  const text = BIOS[i % BIOS.length];
+	  const c = makeCard(text);
+	  ring.add(c); cards.push(c);
+	}
+	// 想一開始出現在正前方的卡片索引（0..N-1）
+	const START_INDEX = 1;
+
+	// 「正前方」的參考角（你的程式裡用的是 3π/2）
+	const FRONT_ANGLE = Math.PI / 2; // 如果出現到背後，改成 Math.PI / 2
+
+	// 計算開場角度：讓 START_INDEX 那張卡片落在 FRONT_ANGLE
+	const initAngle = FRONT_ANGLE - (START_INDEX * Math.PI * 2) / N;
+
+	// 直接把目前角與目標角都設成它 → 第一幀就正前方
+	let ringAngle = initAngle;
+	let targetAngle = initAngle;
+
+    // ---------- input（平順旋轉） ----------
+    //let ringAngle = 0, targetAngle = 0;
+	//targetAngle += 0.0008;   // 速度很慢，幾乎察覺不到；互動時 idle 會歸零照舊
+	let twist = 0;          // 目前自轉角
+	let twistTarget = 0;    // 目標自轉角（由滾輪/觸控推）
+	
+	addEventListener('wheel', e => {
+	  targetAngle += e.deltaY * 0.0012;   // 你原本轉環的
+	  twistTarget += e.deltaY * 0.0030;   // ★ 卡片自轉（調這個速度）
+	}, { passive:true });
+
+
+
+    let touchX = null;
+    // 觸控直向也讓卡片自轉（可選）
+	let touchY = null;
+	addEventListener('touchstart', e=> { touchY = e.touches[0].clientY; }, { passive:true });
+	addEventListener('touchmove',  e=> {
+	  if (touchY==null) return;
+	  const dy = e.touches[0].clientY - touchY;
+	  twistTarget += dy * 0.01;           // ★ 上下滑，卡片繞 Y 轉
+	  touchY = e.touches[0].clientY;
+	}, { passive:true });
+	
+	addEventListener('touchend', ()=> touchY=null);
+	let aimX = 0, aimY = 0, camX = 0, camY = 0;
+	addEventListener('mousemove', e=>{
+	  aimX = (e.clientX / innerWidth  - 0.5) * 0.9;  // 可調
+	  aimY = (e.clientY / innerHeight - 0.5) * 0.6;
+	}, {passive:true});
+
+	// 放在 tick() 外面全域可重複使用
+	const qFaceCam = new THREE.Quaternion();
+	const qOutward = new THREE.Quaternion();
+	const qFinal = new THREE.Quaternion();
+	const tmpM = new THREE.Matrix4();
+	const up = new THREE.Vector3(0,1,0);
+
+    // ---------- loop ----------
+    const invParentQ = new THREE.Quaternion();
+    const faceCamQ = new THREE.Quaternion();
+	twist += (twistTarget - twist) * 0.1;   // 慣性更順
+	
+	const Y_AXIS = new THREE.Vector3(0, 1, 0);
+	const tmpQ   = new THREE.Quaternion();
+	
+	let spineAngle = 0;      // 脊椎目前角度
+	const SPINE_K = -1.0;     // 轉動比例（1=跟環一樣快；-1=反向）
+	const SPINE_PHASE = 0.0; // 相位偏移（想晚半拍可設 Math.PI*0.25）
+let frame = 0;
+    function tick(){
+	 if ((frame++ % 10) === 0) bakeInstancesFaceCamera(); // 視需要調整頻率
+
+		// 在 tick() 內最前面（或 bloom/grade 更新附近）
+  WatercolorBillboardMat.uniforms.uTime.value = performance.now() * 0.001;
+
+  // 從相機的世界矩陣取 Right/Up（第0列是 right，第1列是 up）
+  const e = camera.matrixWorld.elements;
+  WatercolorBillboardMat.uniforms.uCamRight.value.set(e[0], e[1], e[2]);
+  WatercolorBillboardMat.uniforms.uCamUp.value.set(   e[4], e[5], e[6]);
+		// 在 tick() 裡開頭加：
+		gradePass.uniforms.time.value = performance.now() * 0.001;
+
+		// 環旋轉
+		ringAngle += (targetAngle - ringAngle) * 0.08;
+		// 可選：自動慢慢轉（放這裡每幀都會加）
+
+		// 卡片自轉的慣性要在這裡
+		twist += (twistTarget - twist) * 0.10;
+		// 讓脊椎用慣性追 ringAngle（更順）
+		spineAngle += (ringAngle - spineAngle) * 0.12;
+
+		// 只繞 Y 轉；想微微抬頭可加一點 X 傾斜
+		spine.rotation.set(0.05, spineAngle * SPINE_K + SPINE_PHASE, 0);
+
+		pts.rotation.y = ringAngle * Math.PI;
+
+		// 只算一次「面向相機」的基準四元數（抵銷父層）
+		// 先算好面向相機（抵銷父層）的基準四元數
+		// 放在 for 迴圈外：一次算好抵銷父層後的「面向相機」四元數
+		const invParentQ = ring.getWorldQuaternion(new THREE.Quaternion()).invert();
+		const qFaceCam   = camera.quaternion.clone().premultiply(invParentQ);
+
+		// 參數：最大轉角與曲線形狀
+		const MAX_YAW = Math.PI / 4; // 45°
+		// 參數
+		const MAX_BACK = Math.PI;   // 180°
+		const BETA     = 1.0;       // 1.6~2.4：越大在前方越「慢慢地」增加
+
+		for (let i = 0; i < N; i++) {
+		  const angle = ringAngle + (i * Math.PI * 2) / N;
+		  const x = Math.cos(angle) * RADIUS;
+		  const z = Math.sin(angle) * RADIUS;
+		  const y = 0;                       // ★ 固定高度
+		  const card = cards[i];
+
+		  card.position.set(x, y, z);
+
+		  // 與「正前方」(3π/2) 的最短角差 φ ∈ [-π, π]
+		  const FRONT = 1.5 * Math.PI; // 3π/2 = 正前
+		  let phi = THREE.MathUtils.euclideanModulo(angle - FRONT + Math.PI, Math.PI * 2) - Math.PI;
+
+		  // ★ 平滑 yaw：0→側面到 45°→背面到 180°
+		  const u = Math.abs(phi) / Math.PI;         // 0..1
+		  const yawMag = MAX_BACK * Math.pow(u, BETA);  // 大小
+		  const yawRad = -Math.sign(phi) * yawMag;      // 方向：右前負、左前正
+
+		  // 先朝向相機，再加繞自身 Y 軸的 yaw
+		  card.quaternion.copy(qFaceCam);
+		  card.quaternion.multiply(
+			new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0), yawRad)
+		  );
+
+		  // 你的大小/亮度邏輯（可留）
+		  const facing = (z / RADIUS + 1) * 0.5;
+		  const s = 0.85 + facing * 0.22;
+		  card.scale.set(s, s, s); 
+		}
+
+	  camX += (aimX - camX) * 0.06;
+	  camY += (aimY - camY) * 0.06;
+	  camera.position.x = camX;
+	  camera.position.y = -camY;
+	  camera.lookAt(0,0,0);
+
+      composer.render();
+      requestAnimationFrame(tick);
+    }
+    tick();
+  </script>
+</body>
+</html>

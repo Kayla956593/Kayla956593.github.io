@@ -87,6 +87,7 @@
     padding:6px 10px; border-radius:10px;
   }
   .proj a:hover{ background:rgba(255,255,255,.22); }
+  canvas { touch-action: none; }
 </style>
 
   <!-- import map：讓 'three' 與 addons 在瀏覽器可用 -->
@@ -214,7 +215,7 @@
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(42, innerWidth/innerHeight, 0.1, 100);
-    camera.position.set(0, 0, 3.2);
+    camera.position.set(0, 0, 2.9);
     camera.lookAt(0, 10, 0);
 	
 	// 物理正確光照 + 環境反射來源
@@ -654,7 +655,7 @@ const BIOS = [
     // ---------- cards ring (Saturn style) ----------
     const ring = new THREE.Group(); scene.add(ring);
     const CARD_W = 1, CARD_H = 0.5;
-    const RADIUS = 1.5;         // 環靠近脊椎
+    const RADIUS = 1.4;         // 環靠近脊椎
     const N = 5;
     const cards = [];
 
@@ -805,7 +806,44 @@ label.renderOrder = 999;       // 讓它最後疊上來
 	  twistTarget += e.deltaY * 0.0030;   // ★ 卡片自轉（調這個速度）
 	}, { passive:true });
 
+// === Pointer（滑鼠/觸控通吃）===
+let dragging = false;
+let lastX = 0, lastY = 0;
+let vx = 0, vy = 0;          // 慣性速度（左右控制環、上下控制卡片）
+const FRICTION = 0.92;       // 慣性摩擦
+const ROTATE_K = 0.0045;     // 左右靈敏度（環）
+const TWIST_K  = 0.010;      // 上下靈敏度（卡片）
 
+const canvasEl = document.getElementById('webgl');
+
+canvasEl.addEventListener('pointerdown', (e)=>{
+  dragging = true;
+  lastX = e.clientX; lastY = e.clientY;
+  canvasEl.setPointerCapture(e.pointerId);
+});
+
+canvasEl.addEventListener('pointermove', (e)=>{
+  if (!dragging) return;
+  const dx = e.clientX - lastX;
+  const dy = e.clientY - lastY;
+  lastX = e.clientX; lastY = e.clientY;
+
+  // 立即反應
+  targetAngle += dx * ROTATE_K;   // ← 左右滑，轉環
+  twistTarget += dy * TWIST_K;    // ← 上下滑，卡片自轉
+
+  // 更新慣性
+  vx = dx * ROTATE_K;
+  vy = dy * TWIST_K;
+});
+
+function endDrag(e){
+  if (!dragging) return;
+  dragging = false;
+  canvasEl.releasePointerCapture?.(e.pointerId);
+}
+canvasEl.addEventListener('pointerup', endDrag);
+canvasEl.addEventListener('pointercancel', endDrag);
 
     let touchX = null;
     // 觸控直向也讓卡片自轉（可選）
@@ -845,6 +883,8 @@ label.renderOrder = 999;       // 讓它最後疊上來
 	const SPINE_PHASE = 0.0; // 相位偏移（想晚半拍可設 Math.PI*0.25）
 let frame = 0;
     function tick(){
+	if (!dragging) targetAngle += 0.00025; // 很慢、幾乎不打擾操作
+
 	 if ((frame++ % 10) === 0) bakeInstancesFaceCamera(); // 視需要調整頻率
 
 		// 在 tick() 內最前面（或 bloom/grade 更新附近）
@@ -856,6 +896,13 @@ let frame = 0;
   WatercolorBillboardMat.uniforms.uCamUp.value.set(   e[4], e[5], e[6]);
 		// 在 tick() 裡開頭加：
 		gradePass.uniforms.time.value = performance.now() * 0.001;
+  // 慣性：放在更新 ringAngle / twist 之前
+  if (!dragging) {
+    vx *= FRICTION;
+    vy *= FRICTION;
+    if (Math.abs(vx) > 1e-4) targetAngle += vx;
+    if (Math.abs(vy) > 1e-4) twistTarget += vy;
+  }
 
 		// 環旋轉
 		ringAngle += (targetAngle - ringAngle) * 0.08;

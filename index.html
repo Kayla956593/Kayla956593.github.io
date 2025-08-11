@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>Saturn Ring Cards — Glow</title>
   <!-- 把原本放在 <head> 的 <a id="linkedin-btn"> 移除 -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 
 <style>
   html,body{height:100%;margin:0;overflow:hidden;background:#0a0e12}
@@ -88,6 +91,9 @@
   }
   .proj a:hover{ background:rgba(255,255,255,.22); }
   canvas { touch-action: none; }
+  .font-family: 'Inter', 'Helvetica Neue', sans-serif;
+.font-weight: 500;
+.letter-spacing: 0.02em;
 </style>
 
   <!-- import map：讓 'three' 與 addons 在瀏覽器可用 -->
@@ -107,17 +113,17 @@
 
 <!-- ── Topbar ── -->
 <nav class="topbar" aria-label="Quick actions">
-  <a class="btn btn--primary" id="email-btn" href="#" aria-label="Email Kayla">
+  <a class="btn btn--ghost" id="email-btn" href="#" aria-label="Email Kayla">
     <span class="dot"></span><span>Email</span>
   </a>
-  <a class="btn" href="kayla-cv-data.pdf" download aria-label="Download Resume" rel="noopener">
+  <a class="btn btn--ghost" href="kayla-cv-data.pdf" download aria-label="Download Resume" rel="noopener">
     <span class="dot"></span><span>Resume</span>
   </a>
   <a class="btn btn--ghost" href="https://www.linkedin.com/in/kayla-liao-a9a958277/" target="_blank" rel="noopener">
     <span class="dot"></span><span>LinkedIn</span>
   </a>
-  <a class="btn btn--accent" href="https://github.com/Kayla956593" target="_blank" rel="noopener">
-    <span class="dot"></span><span>GITHUB</span>
+  <a class="btn btn--ghost" href="https://github.com/Kayla956593" target="_blank" rel="noopener">
+    <span class="dot"></span><span>Github</span>
   </a>
 </nav>
 
@@ -215,7 +221,7 @@
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(42, innerWidth/innerHeight, 0.1, 100);
-    camera.position.set(0, 0, 2.9);
+    camera.position.set(0, 0, 2.6);
     camera.lookAt(0, 10, 0);
 	
 	// 物理正確光照 + 環境反射來源
@@ -275,7 +281,7 @@
 	
     // particles
     const pGeo = new THREE.BufferGeometry();
-    const COUNT = 1000, positions = new Float32Array(COUNT*3);
+    const COUNT = 400, positions = new Float32Array(COUNT*3);
     for (let i=0;i<COUNT;i++){
       const r = 6 + (Math.random()-0.5)*3;
       const a = Math.random()*Math.PI*2;
@@ -287,204 +293,8 @@
     pGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     const pMat = new THREE.PointsMaterial({ size:0.035, transparent:true, opacity:.6, color:0xa6e1ff });
     const pts = new THREE.Points(pGeo, pMat); scene.add(pts);
-	
-// ---------- watercolor dots (billboard instanced, visible through glass) ----------
-const PCOUNT = 9000;
-const H = spine.userData.height || 20;
-const R_MIN = 0.2, R_MAX = 1.5;
-
-// 每顆的屬性
-const aOffset = new Float32Array(PCOUNT * 3);
-const aSize   = new Float32Array(PCOUNT);
-const aHue    = new Float32Array(PCOUNT);
-const aSeed   = new Float32Array(PCOUNT);
-
-for (let i = 0; i < PCOUNT; i++) {
-  const r = THREE.MathUtils.lerp(R_MIN, R_MAX, Math.random());
-  const a = Math.random() * Math.PI * 2;
-  const t = (i + Math.random()) / PCOUNT;
-  const y = THREE.MathUtils.lerp(-H * 0.5, H * 0.5, t);
-
-  aOffset[i*3+0] = Math.cos(a) * r;
-  aOffset[i*3+1] = y;
-  aOffset[i*3+2] = Math.sin(a) * r;
-
-  aSize[i] = THREE.MathUtils.lerp(0.2, 0.2, Math.random()); // 你的尺寸邏輯
-  aHue[i]  = Math.random();
-  aSeed[i] = Math.random() * 1000.0;
-}
-
-// 單位平面（UV 0..1），用 shader 做 billboard
-const quadGeo = new THREE.PlaneGeometry(1, 1, 1, 1);
-quadGeo.setAttribute('aSize',  new THREE.InstancedBufferAttribute(aSize, 1));
-quadGeo.setAttribute('aHue',   new THREE.InstancedBufferAttribute(aHue, 1));
-quadGeo.setAttribute('aSeed',  new THREE.InstancedBufferAttribute(aSeed, 1));
-quadGeo.setAttribute('aOffset',new THREE.InstancedBufferAttribute(aOffset, 3));
-
-const WatercolorBillboardMat = new THREE.ShaderMaterial({
-  uniforms: {
-    uTime:      { value: 0.0 },
-    uPulseAmp:  { value: 0.12 },
-    uPulseFreq: { value: 0.9 },
-    uCamRight:  { value: new THREE.Vector3() }, // 相機右向（世界座標）
-    uCamUp:     { value: new THREE.Vector3() }, // 相機上向
-  },
-  vertexShader: /* glsl */`
-    attribute float aSize, aHue, aSeed;
-    attribute vec3  aOffset;
-    varying float vHue, vSeed;
-    varying vec2  vUv2;
-    uniform float uTime, uPulseAmp, uPulseFreq;
-    uniform vec3  uCamRight, uCamUp;
-
-    // 將 quad 的頂點 (-0.5..0.5) 轉為世界空間的 billboard
-    void main(){
-      vHue  = aHue; 
-      vSeed = aSeed;
-      vUv2 = uv;
-
-      // 呼吸尺寸
-      float pulse = 1.0 + uPulseAmp * sin(uTime*(6.2831853*uPulseFreq) + aSeed*6.2831853);
-
-      // quad 頂點（-0.5..0.5）
-      vec2 v = (position.xy); // PlaneGeometry 已是 -0.5..0.5
-      float size = aSize * 0.09 * pulse; // 對齊你原本 uSizeScale=22
-
-      // 相機對齊的 billboard 偏移（世界座標）
-      vec3 right = normalize(uCamRight);
-      vec3 up    = normalize(uCamUp);
-      vec3 billboard = right * v.x * size + up * v.y * size;
-
-      // 將中心位移 aOffset 套上父層 modelMatrix（讓它跟著 spine 轉）
-      vec4 centerWorld = modelMatrix * vec4(aOffset, 1.0);
-      vec3 worldPos = centerWorld.xyz + billboard;
-
-      gl_Position = projectionMatrix * viewMatrix * vec4(worldPos, 1.0);
-    }
-  `,
-  fragmentShader: /* glsl */`
-    precision highp float;
-    varying float vHue, vSeed;
-    varying vec2  vUv2;
-
-    float hash(vec2 p){
-      p = vec2(dot(p, vec2(127.1,311.7)), dot(p, vec2(269.5,183.3)));
-      return fract(sin(p.x+p.y) * 43758.5453);
-    }
-    float noise(vec2 p){
-      vec2 i=floor(p), f=fract(p);
-      float a=hash(i), b=hash(i+vec2(1.,0.)), c=hash(i+vec2(0.,1.)), d=hash(i+vec2(1.,1.));
-      vec2 u=f*f*(3.-2.*f);
-      return mix(mix(a,b,u.x), mix(c,d,u.x), u.y);
-    }
-    float fbm(vec2 p){
-      float t=0., amp=.5;
-      for(int i=0;i<5;i++){ t+=noise(p)*amp; p*=2.; amp*=.5; }
-      return t;
-    }
-
-    vec3 hsl2rgb(float h,float s,float l){
-      float c=(1.-abs(2.*l-1.))*s, x=c*(1.-abs(mod(h*6.,2.)-1.)), m=l-.5*c; vec3 rgb;
-      if(h<1./6.) rgb=vec3(c,x,0.); else if(h<2./6.) rgb=vec3(x,c,0.);
-      else if(h<3./6.) rgb=vec3(0.,c,x); else if(h<4./6.) rgb=vec3(0.,x,c);
-      else if(h<5./6.) rgb=vec3(x,0.,c); else rgb=vec3(c,0.,x);
-      return rgb+m;
-    }
-	// 0..1 hash（用 seed 取樣）
-	float rand1(float x){
-	  return fract(sin(x*1234.567 + 0.123)*43758.5453);
-	}
-
-	// 浪漫水彩調色盤（加權 + 輕微抖動）
-	vec3 romanticColor(float id, float seed){
-  // HEX → sRGB(0..1)
-  vec3 P[9];
-  P[0]=vec3(0.988,0.643,0.706); // #fca4b4  粉紅
-  P[1]=vec3(0.937,0.337,0.494); // #ef567e  玫瑰
-  P[2]=vec3(0.866,0.219,0.333); // #dd3855  紅
-  P[3]=vec3(0.702,0.396,0.784); // #b366c8  莓紫
-  P[4]=vec3(0.541,0.309,0.690); // #8a4faf  葡萄紫
-  P[5]=vec3(0.247,0.333,0.659); // #3f55a8  夜藍
-  P[6]=vec3(0.129,0.211,0.431); // #21366e  深夜藍
-  P[7]=vec3(0.686,0.655,0.388); // #afa761  金橄欖
-  P[8]=vec3(0.820,0.765,0.569); // #d1c391  暖米金
-
-  // 權重（總和≈1）：粉/玫瑰/紅 0.45、紫系 0.25、夜藍 0.20、橄欖/米金 0.10
-  float t = rand1(id*97.0 + seed*0.37);
-  int idx =
-    (t < 0.18) ? 0 :       // 粉
-    (t < 0.33) ? 1 :       // 玫瑰
-    (t < 0.45) ? 2 :       // 紅
-    (t < 0.58) ? 3 :       // 莓紫
-    (t < 0.70) ? 4 :       // 葡萄紫
-    (t < 0.82) ? 5 :       // 夜藍
-    (t < 0.90) ? 6 :       // 深夜藍
-    (t < 0.95) ? 7 : 8;    // 橄欖 / 米金（點綴）
-
-  vec3 c = P[idx];
-
-  // 微抖動，避免死板，但限制幅度防螢光
-  float j = (rand1(seed+8.0)-0.5);
-  c += vec3(j*0.06, j*0.06, j*0.06); // 明度微擾
-  c = clamp(c, 0.0, 1.0);
-
-  return c;
-	}
-
-    void main(){
-      // 將平面的 uv 當作圓點的座標
-      vec2 uv = vUv2;
-      vec2 p  = uv*2.0 - 1.0;
-      float r = length(p);
-
-      float n = fbm(uv*3.5 + vSeed);
-      float edge = 0.50 + (n-0.5)*0.26;
-      float body = smoothstep(edge, edge-0.10, r);
-      float grain = fbm(uv*14.0 + vSeed*1.7);
-      float ink = body * (0.86 + (grain-0.5)*0.22);
-	  vec3 C = romanticColor(vHue, vSeed);
-	/* sRGB -> Linear，否則會顯暗、發灰 */
-		//C = pow(C, vec3(2.2));// 在輸出前
-		C = mix(vec3(0.08), C, 0.9); // 微 lift（暗部提一點點）
-		C *= 1.1;                    // 輕 gain（別超過 1.2）
-		C = clamp(C, 0.0, 1.0);
-
-      float alpha = ink * 0.62;
-
-      // 用 alphaTest/discard 做柔邊，但材質本身是不透明材質 → 能進 transmission 背景
-      if (alpha < 0.06) discard;
-
-		gl_FragColor = vec4(C, 1.0);
-    }
-  `,
-  // 關鍵：不透明 + alphaTest（discard）→ 會被玻璃的 transmission 當背景捕捉
-  transparent: false,
-  alphaTest: 0.4,
-  depthWrite: true,
-  depthTest: true,
-  toneMapped: false
-});
-
-const watercolors = new THREE.InstancedMesh(quadGeo, WatercolorBillboardMat, PCOUNT);
-watercolors.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-watercolors.frustumCulled = false;
-watercolors.renderOrder = -100;   // 先畫，讓玻璃能抓到它當背景
-spine.add(watercolors);
-
-// ★ 把位置+朝相機的朝向，烤進 instanceMatrix
-const dummy = new THREE.Object3D();
-function bakeInstancesFaceCamera(){
-  const cq = camera.quaternion;                      // 每顆都面向相機
-  for (let i = 0; i < PCOUNT; i++){
-    dummy.position.set(aOffset[i*3+0], aOffset[i*3+1], aOffset[i*3+2]);
-    dummy.quaternion.copy(cq);
-    dummy.scale.set(1,1,1);
-    dummy.updateMatrix();
-    watercolors.setMatrixAt(i, dummy.matrix);
-  }
-  watercolors.instanceMatrix.needsUpdate = true;
-}
-bakeInstancesFaceCamera(); // 初始化先烤一次
+	 
+ 
 
 //scene.add(watercolors);
 	// === DNA 產生器（雙股螺旋 + 珠珠 + 橫桿，皆用 InstancedMesh）===
@@ -570,93 +380,150 @@ bakeInstancesFaceCamera(); // 初始化先烤一次
 	  return g;
 	}
 
-const BIOS = [
-  "Born in Taiwan, 2001.\nIve always been drawn to\nsolving problems\nand creating things that are\nbeautiful, functional, and meaningful.",
-  "HI, IM KAYLA.\nSoftware & Security Engineer\nI design secure systems and\ncraft interactive 3D experiences.\nScroll, Ill take you through my journey",
-  "If my work sparks your interest,\nlets grab a ☕ and talk ideas.\nId love to explore how I can\nbring value to your team.",
-  "My expertise spans security,\nbackend systems, and\ninteractive design.\nFrom protecting data to ideas —\nI bridge technology and creativity.",
-  "This website —\nincluding the DNA in the background was built from scratch with WebGL.\nI design visuals, code the logic,\nand bring everything to life."
+ const BIOS = [
+  // 5 — Craft of the site
+  "This site was crafted in WebGL —\nI designed the visuals,\nwrote the shaders,\nand shipped the details.",
+  // 1 — Hero
+  "Hi, I’m Kayla.\nSoftware & Security Engineer.\nBuilt on secure foundations,\nDesigned for seamless experiences.",
+
+  // 3 — CTA
+  "If this work resonates,\nlet’s explore.\nI'd love to see\nwhat we can build together",
+
+  // 4 — Focus
+  "Security. Backend. Interaction.\nFrom protecting data—\nto shaping ideas\nIf you can imagine it, I can build it."
+  
 ];
 
+function makeLabelTexture(text, opts = {}) {
+  const {
+    width = 1536,            // 提高解析度更銳利
+    padding = 96,
+    family  = 'Inter, "Helvetica Neue", Arial, sans-serif',
+    baseSize = 52,           // 其餘行
+    firstSize = 52,          // 首行放大 ~108%
+    firstWeight = 500,
+    restWeight  = 500,
+    lineHeight = 1.34,       // ★ 關鍵：Apple 感
+    tracking = 0.0042,        // 0.004–0.006 之間
+    color = '#F7FAFF',       // 比 #EAF2FF 再亮一點
+    align = 'left',
+	shadow= 'rgba(0,0,0,0)' // 或極淡 0.12 + blur 3
+  } = opts;
 
-	function makeLabelTexture(text, opts = {}) {
-	  const {
-		width = 1024,        // 紋理寬
-		padding = 64,        // 內距
-		font = '600 52px "Noto Sans TC", system-ui, -apple-system, Segoe UI, Roboto, "PingFang TC", "Microsoft JhengHei", Helvetica, Arial',
-		lineHeight = 1.25,
-		color = '#EAF2FF',
-		align = 'left',
-		shadow = 'rgba(0,0,0,0.35)'
-	  } = opts;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  const c = document.createElement('canvas');
+  const ctx = c.getContext('2d');
+  c.width = Math.floor(width * dpr);
 
-	  const dpr = Math.min(window.devicePixelRatio || 1, 2);
-	  const c = document.createElement('canvas');
-	  const ctx = c.getContext('2d');
+  const setFont = (w, size) => { ctx.font = `${w} ${size * dpr}px ${family}`; };
 
-	  // 暫定高度，稍後按行數重設
-	  c.width = Math.floor(width * dpr);
+  // 先用 base 字體做換行量測
+  setFont(restWeight, baseSize);
+  ctx.textBaseline = 'top';
+  ctx.fillStyle = color;
 
-	  ctx.font = font.replace(/\d+px/, m => (parseInt(m) * dpr) + 'px');
-	  ctx.textBaseline = 'top';
-	  ctx.fillStyle = color;
-	  ctx.shadowColor = shadow;
-	  ctx.shadowBlur = 8 * dpr;
+  const maxW = c.width - Math.floor(padding * 2 * dpr);
+  const rawLines = text.split('\n');
 
-	  const maxTextWidth = c.width - Math.floor(padding * 2 * dpr);
+  // 逐行 wrap（保留原分段）
+  const lines = [];
+  rawLines.forEach((para, idx) => {
+    const words = [...para]; // 逐字，兼容中英
+    let line = '';
+    const isFirst = (idx === 0);
+    setFont(isFirst ? firstWeight : restWeight, isFirst ? firstSize : baseSize);
+    for (const ch of words) {
+      const test = line + ch;
+      if (ctx.measureText(test).width > maxW && line) { lines.push({str: line, isFirst}); line = ch; }
+      else line = test;
+    }
+    if (line) lines.push({str: line, isFirst});
+  });
+// 測寬：含 tracking
+function measureWithTracking(ctx, str, trackingPx){
+  let w = 0;
+  for (const ch of str){
+    w += ctx.measureText(ch).width;
+    if (ch !== ' ') w += trackingPx;
+  }
+  return w;
+}
 
-	  // 逐字換行（中英都適用）
-	  const lines = [];
-	  let line = '';
-	  for (const ch of text) {
-		const test = line + ch;
-		if (ch === '\n') { lines.push(line); line = ''; continue; }
-		const w = ctx.measureText(test).width;
-		if (w > maxTextWidth) { lines.push(line); line = ch; }
-		else { line = test; }
-	  }
-	  if (line) lines.push(line);
+// 產生行（英文單字換行；CJK 逐字）
+function wrapLines(ctx, text, maxW, trackingPx){
+  const lines = [];
+  for (const para of text.split('\n')){
+    const isLatin = /^[\x00-\x7F\s]+$/.test(para); // 粗略判斷英文
+    const tokens = isLatin ? para.split(/(\s+)/).filter(t=>t.length) : [...para];
+    let line = '';
+    for (const tk of tokens){
+      const test = line + tk;
+      if (measureWithTracking(ctx, test, trackingPx) > maxW && line.trim()){
+        lines.push(line.trimEnd());
+        line = tk.trimStart();
+      } else {
+        line = test;
+      }
+    }
+    if (line) lines.push(line.trimEnd());
+  }
+  return lines;
+}
 
-	  const fontSizePx = parseInt((font.match(/(\d+)px/)||[])[1] || 48, 10);
-	  const lh = fontSizePx * lineHeight * dpr;
-	  const topPad = padding * dpr;
-	  const height = Math.ceil(topPad*2 + lh * lines.length);
+  // 計高
+  const lhFirst = firstSize * lineHeight * dpr;
+  const lhRest  = baseSize  * lineHeight * dpr;
+  const totalH = lines.reduce((h, L) => h + (L.isFirst ? lhFirst : lhRest), padding*dpr*2);
+  c.height = Math.ceil(totalH);
 
-	  c.height = height; // 依實際行數重設高度
-	  // 需重設字體/樣式
-	  ctx.font = font.replace(/\d+px/, m => (parseInt(m) * dpr) + 'px');
-	  ctx.textBaseline = 'top';
-	  ctx.fillStyle = color;
-	  ctx.shadowColor = shadow;
-	  ctx.shadowBlur = 8 * dpr;
+  // 重設字體與樣式（無陰影）
+  ctx.textBaseline = 'top';
+  ctx.fillStyle = color;
 
-	  const xBase =
-		align === 'center' ? c.width/2 :
-		align === 'right'  ? c.width - padding*dpr :
-							 padding*dpr;
+  // 繪字（含 tracking）
+  function drawWithTracking(str, x, y, w, size){
+    setFont(w, size);
+    let cx = x, add = tracking * size * dpr;
+    for (const ch of str) {
+      ctx.fillText(ch, cx, y);
+      cx += ctx.measureText(ch).width + add;
+    }
+  }
 
-	  for (let i=0; i<lines.length; i++) {
-		const y = topPad + i * lh;
-		let x = xBase;
-		if (align !== 'left') {
-		  const w = ctx.measureText(lines[i]).width;
-		  x = align === 'center' ? xBase - w/2 : xBase - w;
-		}
-		ctx.fillText(lines[i], x, y);
-	  }
+  const xBase =
+    align === 'center' ? c.width/2 :
+    align === 'right'  ? c.width - padding*dpr :
+                         padding*dpr;
 
-	  const tex = new THREE.CanvasTexture(c);
-	  tex.colorSpace = THREE.SRGBColorSpace;
-	  tex.anisotropy = 8;
-	  tex.needsUpdate = true;
-	  return tex;
-	}
+  let y = padding * dpr;
+  for (const L of lines) {
+    const size = L.isFirst ? firstSize : baseSize;
+    const weight = L.isFirst ? firstWeight : restWeight;
+    setFont(weight, size);
+    const w = ctx.measureText(L.str).width + (L.str.length-1) * tracking * size * dpr;
 
-    // ---------- cards ring (Saturn style) ----------
+    let x = xBase;
+    if (align !== 'left') x = align === 'center' ? xBase - w/2 : xBase - w;
+
+    drawWithTracking(L.str, x, y, weight, size);
+    y += (L.isFirst ? lhFirst : lhRest);
+  }
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.minFilter = THREE.LinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.anisotropy = 8;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+
+ // ---------- cards ring (Saturn style) ----------
     const ring = new THREE.Group(); scene.add(ring);
     const CARD_W = 1, CARD_H = 0.5;
-    const RADIUS = 1.4;         // 環靠近脊椎
-    const N = 5;
+    const RADIUS = 1.1;         // 環靠近脊椎
+    const N = 4;
     const cards = [];
 
 	function makeCard(labelText = "") {
@@ -669,7 +536,7 @@ const BIOS = [
     transparent: true,
 	thickness: 0.06,        // 薄一點，顏色更清楚
     ior: 1.52,
-	roughness: 0.25,        // 0.2~0.35 之間好看
+	roughness: 0.55,        // 0.2~0.35 之間好看
     metalness: 0.0,
     clearcoat: 0.0,           // 不要鍍膜反光
     specularIntensity: 0.0,   // 關掉鏡面
@@ -758,13 +625,12 @@ bodyBack.visible = false;
 	  const label = new THREE.Mesh(
 		new THREE.PlaneGeometry(CARD_W - 0.28, CARD_H - 0.28),
 		labelMat
-	  );
-	  label.position.z = 0.045;         // 貼在玻璃內側
+	  );       // 貼在玻璃內側
 	  g.add(label);
 
 	  // 之後在 tick() 可用來淡入淡出
 	  g.userData.labelMat = labelMat;
-	  label.position.z = -0.041;   // 如果還是看不到，改成 +0.041 試
+	  label.position.z = -0.06;         
 	  label.rotation.y = Math.PI;  // 讓字不要鏡像（必要時）
 	  label.material.depthWrite = false;
 	  label.material.polygonOffset = true;
@@ -883,19 +749,9 @@ canvasEl.addEventListener('pointercancel', endDrag);
 	const SPINE_PHASE = 0.0; // 相位偏移（想晚半拍可設 Math.PI*0.25）
 let frame = 0;
     function tick(){
-	if (!dragging) targetAngle += 0.00025; // 很慢、幾乎不打擾操作
-
-	 if ((frame++ % 10) === 0) bakeInstancesFaceCamera(); // 視需要調整頻率
-
-		// 在 tick() 內最前面（或 bloom/grade 更新附近）
-  WatercolorBillboardMat.uniforms.uTime.value = performance.now() * 0.001;
-
-  // 從相機的世界矩陣取 Right/Up（第0列是 right，第1列是 up）
-  const e = camera.matrixWorld.elements;
-  WatercolorBillboardMat.uniforms.uCamRight.value.set(e[0], e[1], e[2]);
-  WatercolorBillboardMat.uniforms.uCamUp.value.set(   e[4], e[5], e[6]);
-		// 在 tick() 裡開頭加：
-		gradePass.uniforms.time.value = performance.now() * 0.001;
+	if (!dragging) targetAngle += 0.00005; // 很慢、幾乎不打擾操作
+ 
+		gradePass.uniforms.time.value = performance.now() * 0.008;
   // 慣性：放在更新 ringAngle / twist 之前
   if (!dragging) {
     vx *= FRICTION;
@@ -1017,3 +873,4 @@ addEventListener('keydown', (e)=>{
   </script>
 </body>
 </html>
+

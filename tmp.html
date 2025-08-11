@@ -24,6 +24,7 @@
     display:inline-flex; align-items:center; gap:8px;
     padding:8px 14px; border-radius:12px;
     backdrop-filter: blur(8px) saturate(160%);
+	
     background: rgba(255,255,255,.08);
     border:1px solid rgba(255,255,255,.18);
     color:#fff; text-decoration:none; letter-spacing:.3px;
@@ -190,8 +191,9 @@
 		vec3 grade(vec3 c){
 		  c = mix(vec3(0.), c, 1.0-lift) * gain;               // lift / gain
 		  float l = dot(c, vec3(0.2126,0.7152,0.0722));         // luminance
-		  c = mix(vec3(l), c, sat);                             // saturation
-		  float v = smoothstep(1., 0.2, length(vUv-0.5))*vignette; // vignette
+		  c = mix(vec3(l), c, sat);                             // saturation 
+		  float v = smoothstep(1.25, 0.05, length(vUv-0.5)) * vignette;
+
 		  return c*(1.0-v);
 		}
 		void main(){
@@ -221,7 +223,7 @@
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(42, innerWidth/innerHeight, 0.1, 100);
-    camera.position.set(0, 0, 2.9);
+    camera.position.set(0, 0, 2.6);
     camera.lookAt(0, 10, 0);
 	
 	// 物理正確光照 + 環境反射來源
@@ -234,8 +236,14 @@
     // ---------- postprocessing ----------
     const composer = new EffectComposer(renderer);
     composer.addPass(new RenderPass(scene, camera));// 原本：0.85, 0.8, 0.22
-	const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.45, 0.6, 1.05);
+	const bloom = new UnrealBloomPass(
+	  new THREE.Vector2(innerWidth, innerHeight),
+	  0.35,   // strength ↓
+	  0.9,    // radius ↑ 讓光暈更散
+	  1.2     // threshold ↑ 不要早早就爆亮
+	);
 
+	
 	// ★ 新增顏色分級與微色差
 	const gradePass = new ShaderPass(GradeShader);
 	composer.addPass(gradePass);
@@ -250,7 +258,7 @@
 
     // ---------- lights ----------
     // 曝光再低一點（整體不會爆）
-	renderer.toneMappingExposure = 0.7; // 原本 1.1
+	renderer.toneMappingExposure = 0.6; // 原本 1.1
 
 	// 光線：用更柔的組合
 	// 1) 一點環境光就好
@@ -384,16 +392,14 @@
   // 5 — Craft of the site
   "This site was crafted in WebGL —\nI designed the visuals,\nwrote the shaders,\nand shipped the details.",
   // 1 — Hero
-  "Hi, I’m Kayla.\nSoftware & Security Engineer.\nBuilt on secure foundations,\nDesigned for seamless experiences.",
-
-  // 2 — Value
-  "I build reliable back-end systems\nand deliver graceful solutions —\ncarefully engineered, thoughtfully designed.",
+  "Hi, I’m Kayla.\nSoftware & Security Engineer.\nSecure at the core,\nSeamless by design.",
 
   // 3 — CTA
-  "If this work resonates,\nlet’s explore what we can build together",
+  "If this work resonates,\nlet’s explore.\nI'd love to see\nwhat we can create together.",
 
   // 4 — Focus
-  "Security. Back-end. Interaction.\nFrom protecting data—\nto shaping ideas\nIf you can imagine it, I can build it."
+  "Security. Backend. Interaction.\nFrom protecting data—\nto shaping ideas,\nIf you can imagine it, I can make it."
+  
 ];
 
 function makeLabelTexture(text, opts = {}) {
@@ -524,29 +530,30 @@ function wrapLines(ctx, text, maxW, trackingPx){
  // ---------- cards ring (Saturn style) ----------
     const ring = new THREE.Group(); scene.add(ring);
     const CARD_W = 1, CARD_H = 0.5;
-    const RADIUS = 1.4;         // 環靠近脊椎
-    const N = 5;
+    const RADIUS = 1.1;         // 環靠近脊椎
+    const N = 4;
     const cards = [];
 
 	function makeCard(labelText = "") {
 	const g = new THREE.Group();
 
   // 1) 正面玻璃：只有 FrontSide
-  const glassFront = new THREE.MeshPhysicalMaterial({
-    color: 0xcfe6ff,
-    transmission: 1.0,
-    transparent: true,
-	thickness: 0.06,        // 薄一點，顏色更清楚
-    ior: 1.52,
-	roughness: 0.55,        // 0.2~0.35 之間好看
-    metalness: 0.0,
-    clearcoat: 0.0,           // 不要鍍膜反光
-    specularIntensity: 0.0,   // 關掉鏡面
-    envMapIntensity: 0.0,     // 完全不吃環境反射
-    attenuationColor: new THREE.Color(0xaed8ff),
-    attenuationDistance: 2.5, // 稍短，邊緣會更暗一點
-    side: THREE.FrontSide
-  });
+const glassFront = new THREE.MeshPhysicalMaterial({
+  color: 0xcfe6ff,
+  transmission: 1.0,
+  transparent: true,
+  thickness: 0.05,      // 0.06 → 0.05 稍薄，顏色不會過厚
+  ior: 1.52,
+  roughness: 0.65,      // 0.55 → 0.65 更柔
+  metalness: 0.0,
+  clearcoat: 0.2,       // 0.0 → 0.2 一點鍍膜柔亮
+  clearcoatRoughness: 0.35,
+  specularIntensity: 0.1, // 0.0 → 0.1 微鏡面，不刺
+  envMapIntensity: 0.0,
+  attenuationColor: new THREE.Color(0xaed8ff),
+  attenuationDistance: 3.2, // 2.5 → 3.2 邊緣不會太黑
+  side: THREE.FrontSide
+});
 
   // 2) 背面磨砂板：Basic + 半透明，完全不受燈光/曝光
   const backMat = new THREE.MeshBasicMaterial({
@@ -573,7 +580,9 @@ bodyBack.visible = false;
       color:{value:new THREE.Color(0xbfe4ff)},
       intensity:{value:0.22},      // 降低
       power:{value:1.4},
-      maxAlpha:{value:0.35}        // 上限，避免變白
+      maxAlpha:{value:0.35},     // 上限，避免變白
+	  vignette: { value: 0.28 }, // 0.35 → 0.28
+grainAmp: { value: 0.015 }, // 0.025 → 0.015
     },
     vertexShader: `
       varying vec3 vN; varying vec3 vV;
@@ -753,7 +762,7 @@ let frame = 0;
     function tick(){
 	if (!dragging) targetAngle += 0.00005; // 很慢、幾乎不打擾操作
  
-		gradePass.uniforms.time.value = performance.now() * 0.001;
+		gradePass.uniforms.time.value = performance.now() * 0.008;
   // 慣性：放在更新 ringAngle / twist 之前
   if (!dragging) {
     vx *= FRICTION;
